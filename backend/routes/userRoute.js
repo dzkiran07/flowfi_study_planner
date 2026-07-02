@@ -42,4 +42,46 @@ userRouter.post("/signup", async (req, res) => {
     }
 });
 
+userRouter.post("/login", async (req, res) => {
+    try {
+        const { email, password } = req.body;
+
+        const user = await userModel.findOne({ email });
+
+        if (!user) {
+            return res.status(401).send({
+                message: "Invalid email or password",
+                success: false
+            });
+        }
+
+        const isMatch = await bcrypt.compare(password, user.password);
+
+        if (!isMatch) {
+            return res.status(401).send({
+                message: "Invalid email or password",
+                success: false
+            });
+        }
+
+        res.status(200).send({
+            message: "Login successful",
+            user: {
+                id: user._id,
+                fullName: user.fullName,
+                email: user.email
+            },
+            success: true
+        });
+
+    } catch (err) {
+        console.log(err);
+
+        res.status(500).send({
+            message: "Login failed",
+            success: false
+        });
+    }
+});
+
 export default userRouter
