@@ -1,0 +1,107 @@
+"use client";
+
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
+import { useAuth } from "../context/AuthContext";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import {
+  LayoutDashboard,
+  BookOpen,
+  Timer,
+  Calendar,
+  StickyNote,
+  BarChart3,
+  Settings,
+  LogOut,
+} from "lucide-react";
+
+const navItems = [
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/dashboard/study-planner", label: "Study Planner", icon: BookOpen },
+  { href: "/dashboard/timer", label: "Timer", icon: Timer },
+  { href: "/dashboard/calendar", label: "Calendar", icon: Calendar },
+  { href: "/dashboard/notes", label: "Notes", icon: StickyNote },
+  { href: "/dashboard/statistics", label: "Statistics", icon: BarChart3 },
+  { href: "/dashboard/settings", label: "Settings", icon: Settings },
+];
+
+export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const { user, isLoading, logout } = useAuth();
+  const router = useRouter();
+  const pathname = usePathname();
+
+  useEffect(() => {
+    if (!isLoading && !user) {
+      router.push("/login");
+    }
+  }, [user, isLoading, router]);
+
+  const handleLogout = async () => {
+    await fetch("/api/logout", { method: "POST" });
+    logout();
+    router.push("/login");
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <p className="text-slate-600">Loading...</p>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return null;
+  }
+
+  return (
+    <div className="min-h-screen bg-slate-50">
+      <aside className="fixed inset-y-0 left-0 z-10 w-64 bg-slate-950 text-white flex flex-col">
+        <div className="flex h-16 items-center px-6 border-b border-slate-800">
+          <Link href="/dashboard" className="text-xl font-bold">
+            Flow-Fi
+          </Link>
+        </div>
+
+        <nav className="flex-1 overflow-y-auto p-4 space-y-1">
+          {navItems.map((item) => {
+            const isActive = pathname === item.href;
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                  isActive
+                    ? "bg-slate-800 text-white"
+                    : "text-slate-400 hover:bg-slate-800 hover:text-white"
+                }`}
+              >
+                <item.icon className="h-5 w-5" />
+                {item.label}
+              </Link>
+            );
+          })}
+        </nav>
+
+        <div className="p-4 border-t border-slate-800">
+          <button
+            onClick={handleLogout}
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-slate-400 hover:bg-slate-800 hover:text-white transition-colors"
+          >
+            <LogOut className="h-5 w-5" />
+            Logout
+          </button>
+        </div>
+      </aside>
+
+      <main className="pl-64">
+        <div className="mx-auto max-w-7xl p-6">{children}</div>
+      </main>
+    </div>
+  );
+}
