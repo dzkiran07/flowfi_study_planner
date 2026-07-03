@@ -1,6 +1,10 @@
 import express from "express"
+import dotenv from "dotenv"
 import userModel from "../models/userModel.js";
 import bcrypt from "bcrypt";
+import jwt from "jsonwebtoken";
+
+dotenv.config();
 
 const userRouter = express.Router()
 
@@ -26,9 +30,12 @@ userRouter.post("/signup", async (req, res) => {
             password: hashed
         });
 
+        const token = jwt.sign({ id: result._id, email: result.email }, process.env.JWT_SECRET, { expiresIn: "7d" });
+
         res.status(201).send({
             message: "Signup successful",
             result,
+            token,
             success: true
         });
 
@@ -64,6 +71,8 @@ userRouter.post("/login", async (req, res) => {
             });
         }
 
+        const token = jwt.sign({ id: user._id, email: user.email }, process.env.JWT_SECRET, { expiresIn: "7d" });
+
         res.status(200).send({
             message: "Login successful",
             user: {
@@ -71,6 +80,7 @@ userRouter.post("/login", async (req, res) => {
                 fullName: user.fullName,
                 email: user.email
             },
+            token,
             success: true
         });
 
