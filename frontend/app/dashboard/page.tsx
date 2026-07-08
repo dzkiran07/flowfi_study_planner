@@ -1,13 +1,14 @@
 "use client";
 
 import { useAuth } from "../context/AuthContext";
+import { useTasks, formatDeadline, PRIORITY_COLORS, priorityText, SUBJECT_COLORS, SUBJECT_FALLBACK } from "../context/TaskContext";
 import { Flame, BookOpen, Clock, Calendar as CalendarIcon } from "lucide-react";
 
 import DashboardHeader from "../components/DashboardHeader";
 
 export default function DashboardPage() {
   const { user } = useAuth();
-
+  const { upcomingTasks } = useTasks();
 
   const currentDate = new Date().toLocaleDateString("en-US", {
     weekday: "long",
@@ -15,14 +16,6 @@ export default function DashboardPage() {
     month: "long",
     day: "numeric",
   });
-
-  const tasks = [
-    { name: "Complete Calculus Assignment", due: "Today, 5:00 PM", priority: "High" },
-    { name: "Read Physics Chapter 4", due: "Tomorrow, 2:00 PM", priority: "Medium" },
-    { name: "Submit History Essay", due: "Fri, 11:59 PM", priority: "High" },
-    { name: "Review Biology Notes", due: "Sat, 10:00 AM", priority: "Low" },
-    { name: "Prepare for Chemistry Quiz", due: "Mon, 9:00 AM", priority: "Medium" },
-  ];
 
   const progressSubjects = [
     { name: "Mathematics", percent: 75 },
@@ -85,36 +78,43 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <div className="rounded-xl border border-slate-200 bg-white p-5 lg:col-span-2">
-          <h3 className="text-lg font-semibold text-slate-900">Upcoming Deadlines</h3>
+        <div className="rounded-xl border border-slate-200 bg-white p-5 lg:col-span-2 dark:border-slate-700 dark:bg-slate-800">
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-50">Upcoming Deadlines</h3>
           <div className="mt-4 space-y-3">
-            {tasks.map((task, idx) => (
-              <div
-                key={idx}
-                className="flex items-center justify-between rounded-lg border border-slate-100 p-4"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-50">
-                    <BookOpen className="h-5 w-5 text-slate-600" />
+            {upcomingTasks.length === 0 ? (
+              <p className="text-sm text-slate-500 dark:text-slate-400">No upcoming deadlines. You&apos;re all caught up!</p>
+            ) : (
+              upcomingTasks.map((task) => (
+                <div
+                  key={task.id}
+                  className="group flex items-start gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition-colors hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700/50"
+                >
+                  <div className="pt-0.5">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-50 dark:bg-slate-700">
+                      <BookOpen className="h-5 w-5 text-slate-600 dark:text-slate-300" />
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-sm font-medium text-slate-900">{task.name}</p>
-                    <p className="text-xs text-slate-500">{task.due}</p>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span
+                        className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${SUBJECT_COLORS[task.subject] || SUBJECT_FALLBACK}`}
+                      >
+                        {task.subject}
+                      </span>
+                      <span
+                        className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${PRIORITY_COLORS[task.priority]}`}
+                      >
+                        {priorityText(task.priority)}
+                      </span>
+                    </div>
+                    <p className="mt-2 text-sm font-semibold text-slate-900 dark:text-slate-100">{task.title}</p>
+                    <p className="mt-1 text-xs font-medium text-slate-400 dark:text-slate-300">
+                      Due: {formatDeadline(task.deadlineDate, task.deadlineTime)}
+                    </p>
                   </div>
                 </div>
-                <span
-                  className={`rounded-full px-2.5 py-1 text-xs font-medium ${
-                    task.priority === "High"
-                      ? "bg-red-50 text-red-600"
-                      : task.priority === "Medium"
-                      ? "bg-orange-50 text-orange-600"
-                      : "bg-green-50 text-green-600"
-                  }`}
-                >
-                  {task.priority}
-                </span>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
 

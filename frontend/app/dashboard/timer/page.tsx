@@ -68,13 +68,16 @@ export default function TimerPage() {
   // Handle completion: count pomodoros and auto-advance to the next mode.
   useEffect(() => {
     if (timeLeft !== 0) return;
-    setIsRunning(false);
-    if (mode === "pomodoro") {
-      setCompletedSessions((c) => c + 1);
-      setMode("shortBreak");
-    } else {
-      setMode("pomodoro");
-    }
+    const id = setTimeout(() => {
+      setIsRunning(false);
+      if (mode === "pomodoro") {
+        setCompletedSessions((c) => c + 1);
+        setMode("shortBreak");
+      } else {
+        setMode("pomodoro");
+      }
+    }, 0);
+    return () => clearTimeout(id);
   }, [timeLeft, mode]);
 
   const handleTogglePlay = () => {

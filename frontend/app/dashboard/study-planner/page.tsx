@@ -1,96 +1,23 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Filter, Plus, Trash2, CheckCircle2, Circle, X, ChevronDown, Search } from "lucide-react";
 
 import DashboardHeader from "../../components/DashboardHeader";
-
-
-type Task = {
-  id: number;
-  title: string;
-  description: string;
-  subject: string;
-  priority: "HIGH" | "MEDIUM" | "LOW";
-  completed: boolean;
-};
-
-const DEFAULT_TASKS: Task[] = [
-  {
-    id: 1,
-    title: "Complete Calculus Assignment",
-    description: "Finish problems from chapter 5",
-    subject: "Mathematics",
-    priority: "HIGH",
-    completed: false,
-  },
-  {
-    id: 2,
-    title: "Read Physics Chapter 4",
-    description: "Notes on thermodynamics",
-    subject: "Physics",
-    priority: "MEDIUM",
-    completed: true,
-  },
-  {
-    id: 3,
-    title: "Submit History Essay",
-    description: "Renaissance art analysis",
-    subject: "History",
-    priority: "HIGH",
-    completed: false,
-  },
-];
-
-const STORAGE_KEY = "flowfi_study_tasks";
+import DatePicker from "../../components/DatePicker";
+import TimePicker from "../../components/TimePicker";
+import { useTasks, formatDeadline, PRIORITY_COLORS, priorityText, SUBJECT_COLORS, SUBJECT_FALLBACK, type Priority } from "../../context/TaskContext";
 
 export default function StudyPlannerPage() {
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed)) {
-          setTimeout(() => setTasks(parsed), 0);
-        } else {
-          setTimeout(() => setTasks(DEFAULT_TASKS), 0);
-        }
-      } else {
-        setTimeout(() => setTasks(DEFAULT_TASKS), 0);
-      }
-    } catch {
-      setTasks(DEFAULT_TASKS);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (isLoading) return;
-
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
-  }, [tasks, isLoading]);
-
-  useEffect(() => {
-    function handleStorage() {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
-    }
-
-    window.addEventListener("beforeunload", handleStorage);
-    return () => window.removeEventListener("beforeunload", handleStorage);
-  }, [tasks]);
+  const { tasks, addTask, toggleTask, deleteTask } = useTasks();
 
   const [showForm, setShowForm] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [subject, setSubject] = useState("Mathematics");
-  const [priority, setPriority] = useState<"HIGH" | "MEDIUM" | "LOW">("MEDIUM");
+  const [priority, setPriority] = useState<Priority>("MEDIUM");
+  const [deadlineDate, setDeadlineDate] = useState("");
+  const [deadlineTime, setDeadlineTime] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [filterSubject, setFilterSubject] = useState<string>("All");
   const [filterPriority, setFilterPriority] = useState<string>("All");
@@ -116,56 +43,41 @@ export default function StudyPlannerPage() {
   const completedTasks = tasks.filter((t) => t.completed).length;
   const progressPercent = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
-  const priorityColors: Record<string, string> = {
-    HIGH: "bg-red-50 text-red-600",
-    MEDIUM: "bg-orange-50 text-orange-600",
-    LOW: "bg-green-50 text-green-600",
-  };
-
   const priorityBorderColors: Record<string, string> = {
     HIGH: "border-red-100",
     MEDIUM: "border-orange-100",
     LOW: "border-green-100",
   };
 
-  const subjectColors: Record<string, string> = {
-    Mathematics: "bg-indigo-50 text-indigo-600",
-    Physics: "bg-blue-50 text-blue-600",
-    History: "bg-amber-50 text-amber-600",
-    Chemistry: "bg-emerald-50 text-emerald-600",
-    English: "bg-purple-50 text-purple-600",
-    Biology: "bg-teal-50 text-teal-600",
-    Geography: "bg-rose-50 text-rose-600",
-    ComputerScience: "bg-sky-50 text-sky-600",
-  };
-
   const handleAddTask = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return;
 
-    const newTask: Task = {
-      id: Date.now(),
-      title,
+    addTask({
+      title: title.trim(),
       description,
       subject: subject || "General",
       priority,
       completed: false,
-    };
+      deadlineDate: deadlineDate || undefined,
+      deadlineTime: deadlineTime || undefined,
+    });
 
-    setTasks([newTask, ...tasks]);
     setTitle("");
     setDescription("");
     setSubject("Mathematics");
     setPriority("MEDIUM");
+    setDeadlineDate("");
+    setDeadlineTime("");
     setShowForm(false);
   };
 
   const handleToggle = (id: number) => {
-    setTasks(tasks.map((t) => (t.id === id ? { ...t, completed: !t.completed } : t)));
+    toggleTask(id);
   };
 
   const handleDelete = (id: number) => {
-    setTasks(tasks.filter((t) => t.id !== id));
+    deleteTask(id);
   };
 
   return (
@@ -364,7 +276,7 @@ export default function StudyPlannerPage() {
                   <select
                     id="priority"
                     value={priority}
-                    onChange={(e) => setPriority(e.target.value as "HIGH" | "MEDIUM" | "LOW")}
+                    onChange={(e) => setPriority(e.target.value as Priority)}
                     className="w-full appearance-none rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-indigo-600 focus:outline-none focus:ring-1 focus:ring-indigo-600"
                   >
                     <option value="HIGH">High</option>
@@ -373,6 +285,18 @@ export default function StudyPlannerPage() {
                   </select>
                   <ChevronDown className="absolute right-3 top-2.5 h-4 w-4 text-slate-400 pointer-events-none" />
                 </div>
+              </div>
+              <div>
+                <label htmlFor="deadlineDate" className="block text-sm font-medium text-slate-700 mb-1">
+                  Due Date
+                </label>
+                <DatePicker value={deadlineDate} onChange={setDeadlineDate} />
+              </div>
+              <div>
+                <label htmlFor="deadlineTime" className="block text-sm font-medium text-slate-700 mb-1">
+                  Due Time
+                </label>
+                <TimePicker value={deadlineTime} onChange={setDeadlineTime} />
               </div>
             </div>
             <div className="flex items-center justify-end gap-3 pt-2">
@@ -409,7 +333,7 @@ export default function StudyPlannerPage() {
           filteredTasks.map((task) => (
             <div
               key={task.id}
-              className={`bg-white rounded-2xl p-5 shadow-sm border transition-colors ${
+              className={`group flex items-start gap-4 rounded-2xl bg-white p-5 shadow-sm border transition-colors hover:bg-slate-50 dark:bg-slate-800 dark:border-slate-700 dark:hover:bg-slate-700/50 ${
                 priorityBorderColors[task.priority] || "border-slate-100"
               } ${task.completed ? "opacity-75" : ""}`}
             >
@@ -432,30 +356,33 @@ export default function StudyPlannerPage() {
                   <div className="flex flex-wrap items-center gap-2">
                     <span
                       className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                        subjectColors[task.subject] || "bg-slate-100 text-slate-600"
+                        SUBJECT_COLORS[task.subject] || SUBJECT_FALLBACK
                       }`}
                     >
                       {task.subject}
                     </span>
                     <span
-                      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                        priorityColors[task.priority]
-                      }`}
+                      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${PRIORITY_COLORS[task.priority]}`}
                     >
-                      {task.priority}
+                      {priorityText(task.priority)}
                     </span>
                     {task.completed && (
-                      <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-indigo-50 text-indigo-600">
+                      <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-indigo-50 text-indigo-600 dark:bg-indigo-500/15 dark:text-indigo-300">
                         Completed
                       </span>
                     )}
                   </div>
-                  <p className={`mt-2 text-sm font-medium text-slate-900 ${task.completed ? "line-through text-slate-500" : ""}`}>
+                  <p className={`mt-2 text-sm font-semibold text-slate-900 dark:text-slate-100 ${task.completed ? "line-through text-slate-500" : ""}`}>
                     {task.title}
                   </p>
-                  <p className={`mt-1 text-sm text-slate-500 ${task.completed ? "line-through text-slate-400" : ""}`}>
+                  <p className={`mt-1 text-sm text-slate-500 dark:text-slate-400 ${task.completed ? "line-through text-slate-400" : ""}`}>
                     {task.description}
                   </p>
+                  {task.deadlineDate && (
+                    <p className="mt-2 text-xs font-medium text-slate-400 dark:text-slate-300">
+                      Due: {formatDeadline(task.deadlineDate, task.deadlineTime)}
+                    </p>
+                  )}
                 </div>
 
                 <button
