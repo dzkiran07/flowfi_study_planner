@@ -3,6 +3,9 @@
 import { useState, useEffect } from "react";
 import { Filter, Plus, Trash2, CheckCircle2, Circle, X, ChevronDown, Search } from "lucide-react";
 
+import DashboardHeader from "../../components/DashboardHeader";
+
+
 type Task = {
   id: number;
   title: string;
@@ -53,12 +56,12 @@ export default function StudyPlannerPage() {
       if (stored) {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed)) {
-          setTasks(parsed);
+          setTimeout(() => setTasks(parsed), 0);
         } else {
-          setTasks(DEFAULT_TASKS);
+          setTimeout(() => setTasks(DEFAULT_TASKS), 0);
         }
       } else {
-        setTasks(DEFAULT_TASKS);
+        setTimeout(() => setTasks(DEFAULT_TASKS), 0);
       }
     } catch {
       setTasks(DEFAULT_TASKS);
@@ -167,8 +170,11 @@ export default function StudyPlannerPage() {
 
   return (
     <div className="space-y-6">
-      {/* Top Metrics */}
+      <DashboardHeader title="Study Planner" />
+
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+
+
         <div className="bg-white rounded-2xl p-6 shadow-sm">
           <p className="text-sm text-slate-500">Total Tasks</p>
           <p className="mt-2 text-3xl font-bold text-slate-900">{totalTasks}</p>

@@ -3,8 +3,11 @@
 import { useAuth } from "../context/AuthContext";
 import { Flame, BookOpen, Clock, Calendar as CalendarIcon } from "lucide-react";
 
+import DashboardHeader from "../components/DashboardHeader";
+
 export default function DashboardPage() {
   const { user } = useAuth();
+
 
   const currentDate = new Date().toLocaleDateString("en-US", {
     weekday: "long",
@@ -37,6 +40,9 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
+      <DashboardHeader title="Dashboard" />
+
+
       <div className="rounded-2xl bg-gradient-to-r from-indigo-600 to-pink-500 p-6 text-white">
         <h2 className="text-2xl font-bold">Good Afternoon, {user?.fullName}!</h2>
         <p className="mt-1 text-sm text-white/80">{currentDate}</p>
