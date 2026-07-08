@@ -1,0 +1,45 @@
+/* Dark-mode overrides for components that use hard-coded light utilities
+   (bg-white, text-slate-*, border-slate-*). Scoped under `.dark` and given
+   higher specificity (.dark .<util>) so these win over the base utility while
+   leaving real `dark:` variants untouched in spirit. */
+
+.dark .bg-white {
+  background-color: #1e293b; /* slate-800 */
+}
+.dark .bg-slate-50 {
+  background-color: #1e293b; /* slate-800 */
+}
+.dark .bg-slate-100 {
+  background-color: #334155; /* slate-700 */
+}
+
+.dark .text-slate-900 {
+  color: #f1f5f9; /* slate-100 */
+}
+.dark .text-slate-800 {
+  color: #f1f5f9; /* slate-100 */
+}
+.dark .text-slate-700 {
+  color: #e2e8f0; /* slate-200 */
+}
+.dark .text-slate-600 {
+  color: #cbd5e1; /* slate-300 */
+}
+.dark .text-slate-500 {
+  color: #94a3b8; /* slate-400 */
+}
+.dark .text-slate-400 {
+  color: #94a3b8; /* slate-400 */
+}
+
+.dark .border-slate-200 {
+  border-color: #334155; /* slate-700 */
+}
+.dark .border-slate-100 {
+  border-color: #1e293b; /* slate-800 */
+}
+
+/* Progress / divider tracks */
+.dark .h-px {
+  background-color: #334155;
+}
