@@ -6,7 +6,10 @@ type AuthContextType = {
   user: { id: string; fullName: string; email: string } | null;
   token: string | null;
   isLoading: boolean;
-  login: (user: { id: string; fullName: string; email: string }) => void;
+  login: (data: {
+    user: { id: string; fullName: string; email: string };
+    token: string;
+  }) => void;
   logout: () => void;
 };
 
@@ -26,16 +29,63 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const storedUser = localStorage.getItem("flowfi_user");
     const storedToken = localStorage.getItem("flowfi_token");
-    if (storedUser) setUser(JSON.parse(storedUser));
-    if (storedToken) setToken(storedToken);
-    setIsLoading(false);
+
+    const parsedUser = storedUser ? JSON.parse(storedUser) : null;
+    const parsedToken = storedToken;
+    // Avoid synchronous setState during render/effect body (eslint rule)
+    setTimeout(() => {
+      if (parsedUser) setUser(parsedUser);
+      if (parsedToken) setToken(parsedToken);
+    }, 0);
+
+
+    // If we have a stored token, validate it by calling backend /auth/me.
+    // If validation fails, clear local auth.
+    const validate = async () => {
+      if (!storedToken) {
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        const meRes = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/auth/me`, {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${storedToken}`,
+          },
+        });
+
+        if (!meRes.ok) {
+          throw new Error("Token invalid");
+        }
+
+        const meData = await meRes.json();
+        if (meData?.success && meData?.user) {
+          setUser(meData.user);
+        } else {
+          throw new Error("Unexpected /auth/me response");
+        }
+      } catch {
+        localStorage.removeItem("flowfi_user");
+        localStorage.removeItem("flowfi_token");
+        setUser(null);
+        setToken(null);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    validate();
   }, []);
 
-  const login = (userData: { id: string; fullName: string; email: string }) => {
-    setUser(userData);
-    setToken("mock-token");
-    localStorage.setItem("flowfi_user", JSON.stringify(userData));
-    localStorage.setItem("flowfi_token", "mock-token");
+  const login = (data: {
+    user: { id: string; fullName: string; email: string };
+    token: string;
+  }) => {
+    setUser(data.user);
+    setToken(data.token);
+    localStorage.setItem("flowfi_user", JSON.stringify(data.user));
+    localStorage.setItem("flowfi_token", data.token);
   };
 
   const logout = () => {

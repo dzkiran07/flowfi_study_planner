@@ -23,8 +23,8 @@ export default function SignupPage() {
 
       const data = await res.json();
 
-      if (!res.ok) {
-        setError(data.message || "Signup failed");
+      if (!res.ok || !data?.success) {
+        setError(data?.message || "Signup failed");
       } else {
         window.location.href = "/login";
       }

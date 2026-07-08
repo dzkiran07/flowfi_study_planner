@@ -32,10 +32,10 @@ export default function LoginPage() {
 
       const data = await res.json();
 
-      if (!res.ok) {
-        setError(data.message || "Login failed");
+      if (!res.ok || !data?.success || !data?.token || !data?.user) {
+        setError(data?.message || "Invalid email or password");
       } else {
-        login(data.user);
+        login({ user: data.user, token: data.token });
         window.location.href = "/dashboard";
       }
     } catch {
