@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Play, Pause, RotateCcw, SkipForward, Music, Timer, CheckCircle2 } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { Play, Pause, RotateCcw, SkipForward, Music, Timer, CheckCircle2, ChevronDown } from "lucide-react";
 
 import DashboardHeader from "../../components/DashboardHeader";
+import { useTasks, topicColorClass } from "../../context/TaskContext";
 
 type TimerMode = "pomodoro" | "shortBreak" | "longBreak";
 
@@ -40,11 +41,35 @@ const MODES: Record<
 const MODE_ORDER: TimerMode[] = ["pomodoro", "shortBreak", "longBreak"];
 
 export default function TimerPage() {
+  const { tasks, logSession } = useTasks();
+
   const [mode, setMode] = useState<TimerMode>("pomodoro");
   const [timeLeft, setTimeLeft] = useState(MODES.pomodoro.duration);
   const [isRunning, setIsRunning] = useState(false);
   const [completedSessions, setCompletedSessions] = useState(0);
   const [musicSource, setMusicSource] = useState("");
+
+  // Task linkage: only tasks currently "In Progress" can be tracked.
+  const inProgressTasks = tasks.filter((t) => t.status === "in-progress");
+  const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
+  const selectedTask = tasks.find((t) => t.id === selectedTaskId) ?? null;
+
+  // Ref mirror of the latest selection so the completion handler (which is
+  // intentionally NOT re-subscribed on every selection change) reads fresh data.
+  const selectedTaskRef = useRef(selectedTask);
+
+  // Non-intrusive validation toast.
+  const [toast, setToast] = useState<string | null>(null);
+  useEffect(() => {
+    if (!toast) return;
+    const id = setTimeout(() => setToast(null), 3000);
+    return () => clearTimeout(id);
+  }, [toast]);
+
+  // Keep the ref mirror of the selected task in sync after every render.
+  useEffect(() => {
+    selectedTaskRef.current = selectedTask;
+  });
 
   useEffect(() => {
     // Reset timer whenever the mode changes.
@@ -65,22 +90,35 @@ export default function TimerPage() {
     return () => clearInterval(interval);
   }, [isRunning]);
 
-  // Handle completion: count pomodoros and auto-advance to the next mode.
+  // Handle completion: count pomodoros, log a session, auto-advance mode.
   useEffect(() => {
     if (timeLeft !== 0) return;
     const id = setTimeout(() => {
       setIsRunning(false);
       if (mode === "pomodoro") {
         setCompletedSessions((c) => c + 1);
+        const sel = selectedTaskRef.current;
+        if (sel) {
+          logSession({
+            taskId: sel.id,
+            topic: sel.topic || "General",
+            duration: MODES.pomodoro.duration / 60,
+          });
+        }
         setMode("shortBreak");
       } else {
         setMode("pomodoro");
       }
     }, 0);
     return () => clearTimeout(id);
-  }, [timeLeft, mode]);
+  }, [timeLeft, mode, logSession]);
 
   const handleTogglePlay = () => {
+    const startingFresh = timeLeft === 0 || !isRunning;
+    if (startingFresh && selectedTaskId === null) {
+      setToast("Please select a task to track your focus session.");
+      return;
+    }
     if (timeLeft === 0) {
       setTimeLeft(MODES[mode].duration);
       setIsRunning(true);
@@ -112,6 +150,12 @@ export default function TimerPage() {
     <div className="flex flex-1 flex-col items-center">
       <DashboardHeader title="Timer" />
 
+      {toast && (
+        <div className="fixed left-1/2 top-24 z-50 -translate-x-1/2 rounded-xl border border-amber-200 bg-white px-4 py-2.5 text-sm font-medium text-amber-700 shadow-lg dark:border-amber-500/30 dark:bg-slate-800 dark:text-amber-300">
+          {toast}
+        </div>
+      )}
+
       <div className="mx-auto w-full max-w-xl px-4 py-8">
         {/* Mode switcher */}
         <div className="mb-8 grid grid-cols-3 gap-1.5 rounded-2xl border border-slate-200 bg-slate-100 p-1.5 shadow-sm dark:border-slate-700 dark:bg-slate-800">
@@ -132,6 +176,39 @@ export default function TimerPage() {
               </button>
             );
           })}
+        </div>
+
+        {/* Active task selector */}
+        <div className="mb-6 flex justify-center">
+          <div className="w-full max-w-sm">
+            <label
+              htmlFor="active-task"
+              className="mb-1.5 block text-center text-xs font-medium text-slate-500 dark:text-slate-400"
+            >
+              Select Active Task
+            </label>
+            <div className="relative">
+              <select
+                id="active-task"
+                value={selectedTaskId ?? ""}
+                onChange={(e) => setSelectedTaskId(e.target.value ? Number(e.target.value) : null)}
+                className="w-full appearance-none rounded-xl border border-slate-200 bg-white px-3 py-2.5 pr-9 text-sm font-medium text-slate-900 shadow-sm focus:border-indigo-600 focus:outline-none focus:ring-1 focus:ring-indigo-600 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+              >
+                <option value="">No task selected</option>
+                {inProgressTasks.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.title}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="pointer-events-none absolute right-3 top-2.5 h-4 w-4 text-slate-400" />
+            </div>
+            {inProgressTasks.length === 0 && (
+              <p className="mt-1.5 text-center text-xs text-slate-400 dark:text-slate-500">
+                No tasks in progress. Move a task to “In Progress” in the Study Planner.
+              </p>
+            )}
+          </div>
         </div>
 
         {/* Timer card */}
@@ -171,6 +248,14 @@ export default function TimerPage() {
               <span className={`mt-2 text-sm font-semibold uppercase tracking-widest ${MODES[mode].textColor}`}>
                 {MODES[mode].label}
               </span>
+              {isRunning && selectedTask && (
+                <span
+                  className={`mt-3 inline-flex max-w-[15rem] items-center truncate rounded-full px-3 py-1 text-xs font-medium ${topicColorClass(selectedTask.topic)}`}
+                  title={selectedTask.title}
+                >
+                  <span className="truncate">{selectedTask.title}</span>
+                </span>
+              )}
             </div>
           </div>
 
