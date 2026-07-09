@@ -1,25 +1,39 @@
 "use client";
 
 import { useState } from "react";
-import { Filter, Plus, Trash2, CheckCircle2, Circle, X, ChevronDown, Search } from "lucide-react";
+import { Filter, Plus, Trash2, CheckCircle2, Circle, X, ChevronDown, Search, GripVertical, ListTodo, TrendingUp } from "lucide-react";
 
 import DashboardHeader from "../../components/DashboardHeader";
 import DatePicker from "../../components/DatePicker";
 import TimePicker from "../../components/TimePicker";
-import { useTasks, formatDeadline, PRIORITY_COLORS, priorityText, SUBJECT_COLORS, SUBJECT_FALLBACK, type Priority } from "../../context/TaskContext";
+import {
+  useTasks,
+  calculateStats,
+  PRIORITY_COLORS,
+  priorityText,
+  topicColorClass,
+  getDeadlineInfo,
+  formatDuration,
+  formatDeadline,
+  formatAbsoluteTime,
+  TASK_STATUSES,
+  type Priority,
+  type TaskStatus,
+  type Task,
+} from "../../context/TaskContext";
 
 export default function StudyPlannerPage() {
-  const { tasks, addTask, toggleTask, deleteTask } = useTasks();
+  const { tasks, addTask, setTaskStatus, deleteTask } = useTasks();
 
   const [showForm, setShowForm] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [subject, setSubject] = useState("Mathematics");
+  const [topic, setTopic] = useState("");
   const [priority, setPriority] = useState<Priority>("MEDIUM");
   const [deadlineDate, setDeadlineDate] = useState("");
   const [deadlineTime, setDeadlineTime] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
-  const [filterSubject, setFilterSubject] = useState<string>("All");
+  const [filterTopic, setFilterTopic] = useState<string>("All");
   const [filterPriority, setFilterPriority] = useState<string>("All");
   const [showFilters, setShowFilters] = useState(false);
 
@@ -29,24 +43,27 @@ export default function StudyPlannerPage() {
       query === "" ||
       task.title.toLowerCase().includes(query) ||
       task.description.toLowerCase().includes(query) ||
-      task.subject.toLowerCase().includes(query);
+      task.topic.toLowerCase().includes(query);
 
-    const matchesSubject = filterSubject === "All" || task.subject === filterSubject;
+    const matchesTopic = filterTopic === "All" || task.topic === filterTopic;
     const matchesPriority = filterPriority === "All" || task.priority === filterPriority;
 
-    return matchesSearch && matchesSubject && matchesPriority;
+    return matchesSearch && matchesTopic && matchesPriority;
   });
 
-  const uniqueSubjects = Array.from(new Set(tasks.map((t) => t.subject)));
+  const uniqueTopics = Array.from(new Set(tasks.map((t) => t.topic || "General")));
 
-  const totalTasks = tasks.length;
-  const completedTasks = tasks.filter((t) => t.completed).length;
-  const progressPercent = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+  const stats = calculateStats(tasks);
+  const totalTasks = stats.total;
+  const completedTasks = stats.completed;
+  const progressPercent = stats.productivity;
+  const createdThisWeek = stats.createdThisWeek;
+  const completedThisWeek = stats.completedThisWeek;
 
-  const priorityBorderColors: Record<string, string> = {
-    HIGH: "border-red-100",
-    MEDIUM: "border-orange-100",
-    LOW: "border-green-100",
+  const priorityAccent: Record<string, string> = {
+    HIGH: "border-l-red-500",
+    MEDIUM: "border-l-amber-500",
+    LOW: "border-l-emerald-500",
   };
 
   const handleAddTask = (e: React.FormEvent) => {
@@ -56,28 +73,44 @@ export default function StudyPlannerPage() {
     addTask({
       title: title.trim(),
       description,
-      subject: subject || "General",
+      topic: topic.trim() || "General",
       priority,
-      completed: false,
+      status: "pending",
       deadlineDate: deadlineDate || undefined,
       deadlineTime: deadlineTime || undefined,
     });
 
     setTitle("");
     setDescription("");
-    setSubject("Mathematics");
+    setTopic("");
     setPriority("MEDIUM");
     setDeadlineDate("");
     setDeadlineTime("");
     setShowForm(false);
   };
 
-  const handleToggle = (id: number) => {
-    toggleTask(id);
+  const handleToggle = (id: number, current: TaskStatus) => {
+    setTaskStatus(id, current === "completed" ? "pending" : "completed");
   };
 
-  const handleDelete = (id: number) => {
-    deleteTask(id);
+  const [taskToDelete, setTaskToDelete] = useState<Task | null>(null);
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+
+  const confirmDelete = () => {
+    if (taskToDelete) deleteTask(taskToDelete.id);
+    setTaskToDelete(null);
+  };
+
+  const [draggingId, setDraggingId] = useState<number | null>(null);
+  const [dragOverCol, setDragOverCol] = useState<TaskStatus | null>(null);
+
+  const tasksByStatus = (status: TaskStatus) =>
+    filteredTasks.filter((task) => task.status === status);
+
+  const handleDrop = (status: TaskStatus) => {
+    if (draggingId !== null) setTaskStatus(draggingId, status);
+    setDraggingId(null);
+    setDragOverCol(null);
   };
 
   return (
@@ -85,25 +118,58 @@ export default function StudyPlannerPage() {
       <DashboardHeader title="Study Planner" />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-
-
-        <div className="bg-white rounded-2xl p-6 shadow-sm">
-          <p className="text-sm text-slate-500">Total Tasks</p>
-          <p className="mt-2 text-3xl font-bold text-slate-900">{totalTasks}</p>
+        <div className="group relative rounded-2xl border border-slate-200/70 bg-white p-7 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg dark:border-slate-700/60 dark:bg-slate-800">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">Total Tasks</p>
+              <p className="mt-3 text-4xl font-bold text-slate-900 dark:text-slate-50">{totalTasks}</p>
+            </div>
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-300">
+              <ListTodo className="h-5 w-5" />
+            </div>
+          </div>
+          <p className="mt-3 text-xs font-medium text-slate-400 dark:text-slate-500">
+            <span className="text-emerald-600 dark:text-emerald-400">+{createdThisWeek}</span> this week
+          </p>
         </div>
-        <div className="bg-white rounded-2xl p-6 shadow-sm">
-          <p className="text-sm text-slate-500">Completed</p>
-          <p className="mt-2 text-3xl font-bold text-slate-900">{completedTasks}</p>
+
+        <div className="group relative rounded-2xl border border-slate-200/70 bg-white p-7 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg dark:border-slate-700/60 dark:bg-slate-800">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">Completed</p>
+              <p className="mt-3 text-4xl font-bold text-slate-900 dark:text-slate-50">{completedTasks}</p>
+            </div>
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-300">
+              <CheckCircle2 className="h-5 w-5" />
+            </div>
+          </div>
+          <p className="mt-3 text-xs font-medium text-slate-400 dark:text-slate-500">
+            <span className={completedThisWeek > 0 ? "text-emerald-600 dark:text-emerald-400" : ""}>
+              {completedThisWeek > 0 ? `+${completedThisWeek}` : "0"}
+            </span>{" "}
+            this week
+          </p>
         </div>
-        <div className="bg-white rounded-2xl p-6 shadow-sm">
-          <p className="text-sm text-slate-500">Overall Progress</p>
-          <p className="mt-2 text-3xl font-bold text-slate-900">{progressPercent}%</p>
-          <div className="mt-3 h-2 w-full rounded-full bg-slate-100">
+
+        <div className="group relative rounded-2xl border border-slate-200/70 bg-white p-7 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg dark:border-slate-700/60 dark:bg-slate-800">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">Overall Progress</p>
+              <p className="mt-3 text-4xl font-bold text-slate-900 dark:text-slate-50">{progressPercent}%</p>
+            </div>
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-purple-50 text-purple-600 dark:bg-purple-500/10 dark:text-purple-300">
+              <TrendingUp className="h-5 w-5" />
+            </div>
+          </div>
+          <div className="mt-4 h-2.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-700">
             <div
-              className="h-2 rounded-full bg-indigo-600 transition-all duration-300"
+              className="h-2.5 rounded-full bg-gradient-to-r from-purple-500 to-blue-500 transition-all duration-500"
               style={{ width: `${progressPercent}%` }}
             />
           </div>
+          <p className="mt-3 text-xs font-medium text-slate-400 dark:text-slate-500">
+            {completedTasks} of {totalTasks} completed
+          </p>
         </div>
       </div>
 
@@ -124,16 +190,16 @@ export default function StudyPlannerPage() {
             <button
               onClick={() => setShowFilters(!showFilters)}
               className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
-                showFilters || filterSubject !== "All" || filterPriority !== "All"
+                showFilters || filterTopic !== "All" || filterPriority !== "All"
                   ? "border-indigo-200 bg-indigo-50 text-indigo-700"
                   : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
               }`}
             >
               <Filter className="h-4 w-4" />
               Filter
-              {(filterSubject !== "All" || filterPriority !== "All") && (
+              {(filterTopic !== "All" || filterPriority !== "All") && (
                 <span className="ml-1 rounded-full bg-indigo-100 px-1.5 py-0.5 text-xs font-semibold text-indigo-700">
-                  {[filterSubject, filterPriority].filter((v) => v !== "All").length}
+                  {[filterTopic, filterPriority].filter((v) => v !== "All").length}
                 </span>
               )}
             </button>
@@ -142,14 +208,14 @@ export default function StudyPlannerPage() {
               <div className="absolute left-0 top-full z-20 mt-2 w-72 rounded-xl border border-slate-200 bg-white p-4 shadow-lg">
                 <div className="space-y-3">
                   <div>
-                    <label className="block text-xs font-medium text-slate-500 mb-1">Subject</label>
+                    <label className="block text-xs font-medium text-slate-500 mb-1">Topic</label>
                     <select
-                      value={filterSubject}
-                      onChange={(e) => setFilterSubject(e.target.value)}
+                      value={filterTopic}
+                      onChange={(e) => setFilterTopic(e.target.value)}
                       className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:border-indigo-600 focus:outline-none focus:ring-1 focus:ring-indigo-600"
                     >
-                      <option value="All">All Subjects</option>
-                      {uniqueSubjects.map((s) => (
+                      <option value="All">All Topics</option>
+                      {uniqueTopics.map((s) => (
                         <option key={s} value={s}>
                           {s}
                         </option>
@@ -173,7 +239,7 @@ export default function StudyPlannerPage() {
                     <button
                       type="button"
                       onClick={() => {
-                        setFilterSubject("All");
+                        setFilterTopic("All");
                         setFilterPriority("All");
                         setShowFilters(false);
                       }}
@@ -244,29 +310,18 @@ export default function StudyPlannerPage() {
                   placeholder="Enter task description"
                 />
               </div>
-              <div>
-                <label htmlFor="subject" className="block text-sm font-medium text-slate-700 mb-1">
-                  Subject
+              <div className="sm:col-span-2">
+                <label htmlFor="topic" className="block text-sm font-medium text-slate-700 mb-1">
+                  Topic
                 </label>
-                <div className="relative">
-                  <select
-                    id="subject"
-                    value={subject}
-                    onChange={(e) => setSubject(e.target.value)}
-                    className="w-full appearance-none rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-indigo-600 focus:outline-none focus:ring-1 focus:ring-indigo-600"
-                  >
-                    <option value="Mathematics">Mathematics</option>
-                    <option value="Physics">Physics</option>
-                    <option value="Chemistry">Chemistry</option>
-                    <option value="Biology">Biology</option>
-                    <option value="English">English</option>
-                    <option value="History">History</option>
-                    <option value="Geography">Geography</option>
-                    <option value="ComputerScience">Computer Science</option>
-                    <option value="Other">Other</option>
-                  </select>
-                  <ChevronDown className="absolute right-3 top-2.5 h-4 w-4 text-slate-400 pointer-events-none" />
-                </div>
+                <input
+                  id="topic"
+                  type="text"
+                  value={topic}
+                  onChange={(e) => setTopic(e.target.value)}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-indigo-600 focus:outline-none focus:ring-1 focus:ring-indigo-600"
+                  placeholder="e.g. Mathematics, Coding, History"
+                />
               </div>
               <div>
                 <label htmlFor="priority" className="block text-sm font-medium text-slate-700 mb-1">
@@ -319,84 +374,255 @@ export default function StudyPlannerPage() {
         </div>
       )}
 
-      {/* Task List Container */}
-      <div className="space-y-4">
-        {filteredTasks.length === 0 ? (
-          <div className="bg-white rounded-2xl p-12 shadow-sm text-center">
-            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-slate-50">
-              <Search className="h-6 w-6 text-slate-400" />
-            </div>
-            <h3 className="mt-4 text-sm font-semibold text-slate-900">No tasks found</h3>
-            <p className="mt-1 text-sm text-slate-500">Try adjusting your search or filters.</p>
+      {/* Kanban Board */}
+      {filteredTasks.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-12 text-center shadow-sm dark:border-slate-700 dark:bg-slate-800">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-slate-50 dark:bg-slate-700">
+            <Search className="h-6 w-6 text-slate-400" />
           </div>
-        ) : (
-          filteredTasks.map((task) => (
-            <div
-              key={task.id}
-              className={`group flex items-start gap-4 rounded-2xl bg-white p-5 shadow-sm border transition-colors hover:bg-slate-50 dark:bg-slate-800 dark:border-slate-700 dark:hover:bg-slate-700/50 ${
-                priorityBorderColors[task.priority] || "border-slate-100"
-              } ${task.completed ? "opacity-75" : ""}`}
-            >
-              <div className="flex items-start gap-4">
-                <div className="pt-1">
-                  <button
-                    onClick={() => handleToggle(task.id)}
-                    className="rounded-full transition-colors"
-                    aria-label={task.completed ? "Mark as incomplete" : "Mark as complete"}
-                  >
-                    {task.completed ? (
-                      <CheckCircle2 className="h-5 w-5 text-indigo-600" />
-                    ) : (
-                      <Circle className="h-5 w-5 text-slate-300 hover:text-indigo-600" />
-                    )}
-                  </button>
+          <h3 className="mt-4 text-sm font-semibold text-slate-900 dark:text-slate-100">No tasks found</h3>
+          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Try adjusting your search or filters.</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {TASK_STATUSES.map((col) => {
+            const colTasks = tasksByStatus(col.key);
+            const isOver = dragOverCol === col.key;
+            return (
+              <div
+                key={col.key}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setDragOverCol(col.key);
+                }}
+                onDragLeave={(e) => {
+                  if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                    setDragOverCol((prev) => (prev === col.key ? null : prev));
+                  }
+                }}
+                onDrop={() => handleDrop(col.key)}
+                className={`flex flex-col rounded-2xl border bg-slate-50/70 p-3 transition-colors dark:bg-slate-800/40 ${
+                  col.accent
+                } ${isOver ? "ring-2 ring-indigo-400 ring-offset-1 dark:ring-offset-slate-900" : ""}`}
+              >
+                <div className="mb-3 flex items-center justify-between px-1">
+                  <div className="flex items-center gap-2">
+                    <span className={`h-2.5 w-2.5 rounded-full ${col.dot}`} />
+                    <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">{col.label}</h3>
+                  </div>
+                  <span className="rounded-full bg-white px-2 py-0.5 text-xs font-medium text-slate-500 dark:bg-slate-700 dark:text-slate-300">
+                    {colTasks.length}
+                  </span>
                 </div>
 
-                <div className="flex-1 min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span
-                      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                        SUBJECT_COLORS[task.subject] || SUBJECT_FALLBACK
-                      }`}
-                    >
-                      {task.subject}
-                    </span>
-                    <span
-                      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${PRIORITY_COLORS[task.priority]}`}
-                    >
-                      {priorityText(task.priority)}
-                    </span>
-                    {task.completed && (
-                      <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-indigo-50 text-indigo-600 dark:bg-indigo-500/15 dark:text-indigo-300">
-                        Completed
-                      </span>
-                    )}
-                  </div>
-                  <p className={`mt-2 text-sm font-semibold text-slate-900 dark:text-slate-100 ${task.completed ? "line-through text-slate-500" : ""}`}>
-                    {task.title}
-                  </p>
-                  <p className={`mt-1 text-sm text-slate-500 dark:text-slate-400 ${task.completed ? "line-through text-slate-400" : ""}`}>
-                    {task.description}
-                  </p>
-                  {task.deadlineDate && (
-                    <p className="mt-2 text-xs font-medium text-slate-400 dark:text-slate-300">
-                      Due: {formatDeadline(task.deadlineDate, task.deadlineTime)}
-                    </p>
+                <div className="flex min-h-[120px] flex-col gap-3">
+                  {colTasks.length === 0 ? (
+                    <div className="flex flex-1 items-center justify-center rounded-xl border border-dashed border-slate-200 py-8 text-xs text-slate-400 dark:border-slate-700">
+                      No tasks
+                    </div>
+                  ) : (
+                    colTasks.map((task) => {
+                      const deadline = getDeadlineInfo(task);
+                      const DeadlineIcon = deadline.icon;
+                      const isCompleted = task.status === "completed";
+                      const completedIn = isCompleted
+                        ? formatDuration((task.completedAt ?? Date.now()) - task.createdAt)
+                        : "";
+                      return (
+                        <div
+                          key={task.id}
+                          draggable
+                          onDragStart={(e) => {
+                            setDraggingId(task.id);
+                            e.dataTransfer.effectAllowed = "move";
+                          }}
+                          onDragEnd={() => {
+                            setDraggingId(null);
+                            setDragOverCol(null);
+                          }}
+                          onClick={() => setSelectedTask(task)}
+                          className={`group flex cursor-grab items-start gap-3 rounded-xl border border-slate-200 border-l-4 bg-white p-3 shadow-sm transition-all hover:shadow-md active:cursor-grabbing dark:border-slate-700 dark:bg-slate-800 ${
+                            priorityAccent[task.priority] || "border-l-slate-300"
+                          } ${draggingId === task.id ? "opacity-40" : ""} ${isCompleted ? "opacity-80" : ""}`}
+                        >
+                          <GripVertical className="mt-0.5 h-4 w-4 shrink-0 text-slate-300 dark:text-slate-600" />
+
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleToggle(task.id, task.status);
+                            }}
+                            className="mt-0.5 shrink-0 rounded-full transition-transform hover:scale-110 active:scale-95"
+                            aria-label={isCompleted ? "Mark as incomplete" : "Mark as complete"}
+                          >
+                            {isCompleted ? (
+                              <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                            ) : (
+                              <Circle className="h-5 w-5 text-slate-300 hover:text-indigo-600 dark:text-slate-600" />
+                            )}
+                          </button>
+
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <span
+                                className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${topicColorClass(task.topic)}`}
+                              >
+                                {task.topic}
+                              </span>
+                              <span
+                                className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${PRIORITY_COLORS[task.priority]}`}
+                              >
+                                {priorityText(task.priority)}
+                              </span>
+                            </div>
+
+                            <p
+                              className={`mt-1.5 text-sm font-semibold text-slate-900 dark:text-slate-100 ${
+                                isCompleted ? "line-through text-slate-500" : ""
+                              }`}
+                            >
+                              {task.title}
+                            </p>
+                            {task.description && (
+                              <p
+                                className={`mt-0.5 line-clamp-2 text-xs text-slate-500 dark:text-slate-400 ${
+                                  isCompleted ? "line-through text-slate-400" : ""
+                                }`}
+                              >
+                                {task.description}
+                              </p>
+                            )}
+
+                            <div className="mt-2 flex items-center justify-between gap-2">
+                              <span
+                                className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${deadline.chip}`}
+                              >
+                                <DeadlineIcon className="h-3 w-3" />
+                                {deadline.label}
+                              </span>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setTaskToDelete(task);
+                                }}
+                                className="shrink-0 rounded-md p-1 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-500/10"
+                                aria-label="Delete task"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
+
+                            {isCompleted && (
+                              <p className="mt-2 inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
+                                <CheckCircle2 className="h-3 w-3" />
+                                Completed in {completedIn}
+                              </p>
+      )}
+                          </div>
+                        </div>
+                      );
+                    })
                   )}
                 </div>
-
-                <button
-                  onClick={() => handleDelete(task.id)}
-                  className="shrink-0 rounded-lg p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
-                  aria-label="Delete task"
-                >
-                  <Trash2 className="h-5 w-5" />
-                </button>
               </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Task detail modal */}
+      {selectedTask && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4"
+          onClick={() => setSelectedTask(null)}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Task details"
+        >
+          <div
+            className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-xl dark:border-slate-700 dark:bg-slate-800"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <span
+                  className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${topicColorClass(selectedTask.topic)}`}
+                >
+                  {selectedTask.topic}
+                </span>
+                <span
+                  className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${PRIORITY_COLORS[selectedTask.priority]}`}
+                >
+                  {priorityText(selectedTask.priority)}
+                </span>
+                <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600 dark:bg-slate-700 dark:text-slate-300">
+                  {TASK_STATUSES.find((s) => s.key === selectedTask.status)?.label ?? selectedTask.status}
+                </span>
+              </div>
+              <button
+                onClick={() => setSelectedTask(null)}
+                className="shrink-0 rounded-lg p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-700"
+                aria-label="Close"
+              >
+                <X className="h-5 w-5" />
+              </button>
             </div>
-          ))
-        )}
-      </div>
+
+            <h3 className="mt-4 text-lg font-semibold text-slate-900 dark:text-slate-100">{selectedTask.title}</h3>
+
+            {selectedTask.description && (
+              <p className="mt-2 text-sm leading-relaxed text-slate-500 dark:text-slate-400">
+                {selectedTask.description}
+              </p>
+            )}
+
+            <div className="mt-5 space-y-2.5 rounded-xl bg-slate-50 p-4 text-sm dark:bg-slate-900/50">
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500 dark:text-slate-400">Status</span>
+                <span className="font-medium text-slate-900 dark:text-slate-100">
+                  {TASK_STATUSES.find((s) => s.key === selectedTask.status)?.label ?? selectedTask.status}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500 dark:text-slate-400">Created</span>
+                <span className="font-medium text-slate-900 dark:text-slate-100">
+                  {formatAbsoluteTime(selectedTask.createdAt)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500 dark:text-slate-400">Deadline</span>
+                <span className="font-medium text-slate-900 dark:text-slate-100">
+                  {selectedTask.deadlineDate
+                    ? formatDeadline(selectedTask.deadlineDate, selectedTask.deadlineTime)
+                    : "—"}
+                </span>
+              </div>
+              {selectedTask.status === "completed" && (
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500 dark:text-slate-400">Completed in</span>
+                  <span className="font-medium text-emerald-600 dark:text-emerald-400">
+                    {formatDuration((selectedTask.completedAt ?? Date.now()) - selectedTask.createdAt)}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            <div className="mt-5 flex items-center justify-end">
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedTask(null);
+                  setTaskToDelete(selectedTask);
+                }}
+                className="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-white px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 dark:border-red-500/30 dark:bg-slate-900 dark:hover:bg-red-500/10"
+              >
+                <Trash2 className="h-4 w-4" />
+                Delete task
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
