@@ -1,12 +1,14 @@
+import Image from "next/image";
 import Link from "next/link";
 
 export default function LandingPage() {
   return (
-    <div className="flex min-h-screen flex-col bg-zinc-50 dark:bg-black">
+    <div className="flex min-h-screen flex-col bg-background dark:bg-black">
       <header className="px-6 py-4">
         <nav className="mx-auto flex max-w-7xl items-center justify-between">
-          <Link href="/" className="text-2xl font-bold text-zinc-900 dark:text-zinc-50">
-            FlowFi
+          <Link href="/" className="flex items-center gap-2 text-2xl font-bold text-zinc-900 dark:text-zinc-50">
+            <Image src="/images/flowfilogo.png" alt="" width={32} height={32} className="h-8 w-8 rounded-lg object-contain" />
+            Flow-Fi
           </Link>
           <div className="flex items-center gap-4">
             <Link href="/login" className="text-sm font-medium text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50">
