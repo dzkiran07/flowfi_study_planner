@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 
 export default function SignupPage() {
   const [fullName, setFullName] = useState("");
@@ -36,10 +37,17 @@ export default function SignupPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 px-4 dark:bg-black">
+    <div className="flex min-h-screen items-center justify-center bg-background px-4 dark:bg-black">
       <div className="w-full max-w-md space-y-8">
         <div className="text-center">
-          <h1 className="text-3xl font-bold text-zinc-900 dark:text-zinc-50">
+          <Image
+            src="/images/flowfilogo.png"
+            alt="Flow-Fi"
+            width={56}
+            height={56}
+            className="mx-auto h-14 w-14 rounded-2xl object-contain"
+          />
+          <h1 className="mt-4 text-3xl font-bold text-zinc-900 dark:text-zinc-50">
             Create Account
           </h1>
           <p className="mt-2 text-zinc-600 dark:text-zinc-400">
