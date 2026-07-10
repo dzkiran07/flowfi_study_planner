@@ -2,6 +2,8 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { AlertTriangle, BookOpen, Calendar as CalendarIcon, CheckCircle2, Clock, Pencil, PlayCircle, PlusCircle, Trash2 } from "lucide-react";
+import { useAuth } from "./AuthContext";
+import { authFetch } from "../lib/api";
 
 export type Priority = "HIGH" | "MEDIUM" | "LOW";
 
@@ -12,7 +14,7 @@ export type TaskStatus = "pending" | "in-progress" | "completed";
 export const TASK_STATUS_KEYS: TaskStatus[] = ["pending", "in-progress", "completed"];
 
 export type Task = {
-  id: number;
+  id: string;
   title: string;
   description: string;
   topic: string;
@@ -111,9 +113,11 @@ export function formatDuration(ms: number): string {
   return `${days}d, ${hrs}h, ${mins}m`;
 }
 
+// Legacy localStorage keys — read only for the one-time migration to the backend.
 const TASKS_KEY = "flowfi_study_tasks";
 const RECENT_KEY = "flowfi_recent_activities";
 const SESSIONS_KEY = "flowfi_study_sessions";
+const MIGRATED_KEY = "flowfi_migrated_v1";
 const MAX_ACTIVITIES = 8;
 
 const DEFAULT_ACTIVITIES: Activity[] = [
@@ -121,45 +125,6 @@ const DEFAULT_ACTIVITIES: Activity[] = [
   { id: 2, text: 'Added "Submit History Essay" - History', at: Date.now() - 1000 * 60 * 60 * 3, type: "created" },
   { id: 3, text: 'Started "Calculus" study session', at: Date.now() - 1000 * 60 * 60 * 5, type: "started" },
   { id: 4, text: 'Added "Complete Calculus Assignment" - Mathematics', at: Date.now() - 1000 * 60 * 60 * 26, type: "created" },
-];
-
-const DAY = 24 * 60 * 60 * 1000;
-
-const DEFAULT_TASKS: Task[] = [
-  {
-    id: 1,
-    title: "Complete Calculus Assignment",
-    description: "Finish problems from chapter 5",
-    topic: "Mathematics",
-    priority: "HIGH",
-    status: "pending",
-    createdAt: Date.now() - 2 * DAY,
-    deadlineDate: "2026-07-10",
-    deadlineTime: "17:00",
-  },
-  {
-    id: 2,
-    title: "Read Physics Chapter 4",
-    description: "Notes on thermodynamics",
-    topic: "Physics",
-    priority: "MEDIUM",
-    status: "completed",
-    createdAt: Date.now() - 5 * DAY,
-    completedAt: Date.now() - 2 * DAY,
-    deadlineDate: "2026-07-12",
-    deadlineTime: "14:00",
-  },
-  {
-    id: 3,
-    title: "Submit History Essay",
-    description: "Renaissance art analysis",
-    topic: "History",
-    priority: "HIGH",
-    status: "pending",
-    createdAt: Date.now() - 1 * DAY,
-    deadlineDate: "2026-07-15",
-    deadlineTime: "23:59",
-  },
 ];
 
 // Shared priority-badge styling (colorful, solid badges used on both pages).
@@ -220,10 +185,10 @@ export function aggregateTopics(tasks: Task[]): ProgressItem[] {
 
 // A single, logged Pomodoro focus session tied to a task (if any).
 export type Session = {
-  id: number;
+  id: string;
   /** Length of the session in minutes (e.g. 25 for a Pomodoro). */
   duration: number;
-  taskId: number | null;
+  taskId: string | null;
   topic: string;
   timestamp: number; // epoch ms when the session completed
 };
@@ -274,10 +239,17 @@ export type Stats = {
 
 /**
  * Centralized, single-source-of-truth stat helper. Active, Completed and
- * Productivity come from the master tasks array; Study Hours are summed from
- * the logged focus `sessions` (each session's `duration` is in minutes).
+ * Productivity come from the master tasks array; Study Hours are session-aware:
+ * they sum the logged, completed focus `sessions` (each session's `duration`
+ * is in minutes) PLUS `liveElapsedMinutes` from a Pomodoro that's still
+ * running, so the stat is responsive in real time rather than waiting for
+ * the session to finish.
  */
-export function calculateStats(tasks: Task[], sessions: Session[] = []): Stats {
+export function calculateStats(
+  tasks: Task[],
+  sessions: Session[] = [],
+  liveElapsedMinutes: number = 0,
+): Stats {
   const now = Date.now();
   const weekAgo = now - WEEK_MS;
 
@@ -303,6 +275,11 @@ export function calculateStats(tasks: Task[], sessions: Session[] = []): Stats {
     studyHours += hours;
     if (s.timestamp >= weekAgo) studyHoursThisWeek += hours;
   }
+
+  // The active session (if any) is always "this week", by definition of "now".
+  const liveHours = Math.max(0, liveElapsedMinutes) / 60;
+  studyHours += liveHours;
+  studyHoursThisWeek += liveHours;
 
   const total = tasks.length;
   const productivity = total > 0 ? Math.round((completed / total) * 100) : 0;
@@ -409,11 +386,12 @@ export function getDeadlineInfo(task: Task): DeadlineInfo {
   return { status: "upcoming", label: `Due ${formatDeadline(task.deadlineDate, task.deadlineTime)}`, icon: CalendarIcon, chip: "bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300" };
 }
 
-// Backward compatibility: migrate legacy `subject`/`completed` data to
-// `topic`/`status` so existing localStorage entries keep working.
-function migrateTask(t: Partial<Task> & { subject?: string; completed?: boolean }): Task {
+// Backward compatibility: normalizes a legacy localStorage task entry
+// (possibly using the old `subject`/`completed` fields) before it's POSTed
+// to the backend during the one-time migration.
+function migrateTask(t: Partial<Task> & { subject?: string; completed?: boolean; id?: number | string }): Task {
   return {
-    id: t.id ?? Date.now(),
+    id: t.id !== undefined ? String(t.id) : String(Date.now()),
     title: t.title ?? "",
     description: t.description ?? "",
     topic: (t.topic ?? t.subject ?? "General").trim() || "General",
@@ -430,14 +408,140 @@ function migrateTask(t: Partial<Task> & { subject?: string; completed?: boolean 
   };
 }
 
+// Shapes returned by the backend (Mongo docs, dates as ISO strings).
+type RawTask = {
+  _id: string;
+  title: string;
+  description: string;
+  topic: string;
+  priority: Priority;
+  status: TaskStatus;
+  completedAt: string | null;
+  deadlineDate: string | null;
+  deadlineTime: string | null;
+  createdAt: string;
+};
+
+type RawSession = {
+  _id: string;
+  task: string | null;
+  topic: string;
+  duration: number;
+  createdAt: string;
+};
+
+function mapTask(t: RawTask): Task {
+  return {
+    id: t._id,
+    title: t.title,
+    description: t.description,
+    topic: t.topic,
+    priority: t.priority,
+    status: t.status,
+    createdAt: new Date(t.createdAt).getTime(),
+    completedAt: t.completedAt ? new Date(t.completedAt).getTime() : undefined,
+    deadlineDate: t.deadlineDate ?? undefined,
+    deadlineTime: t.deadlineTime ?? undefined,
+  };
+}
+
+function mapSession(s: RawSession): Session {
+  return {
+    id: s._id,
+    duration: s.duration,
+    taskId: s.task,
+    topic: s.topic,
+    timestamp: new Date(s.createdAt).getTime(),
+  };
+}
+
+/**
+ * One-time client-side migration: if this browser still has legacy
+ * localStorage task/session data and the account has nothing in the
+ * database yet, push it up via the API once and flag it done. There is no
+ * server-side script that can reach into a user's browser, so this has to
+ * run from here, gated by `MIGRATED_KEY` so it never re-runs.
+ */
+async function migrateLegacyData(token: string): Promise<{ tasks: Task[]; sessions: Session[] } | null> {
+  if (typeof window === "undefined") return null;
+  if (localStorage.getItem(MIGRATED_KEY)) return null;
+
+  const storedTasks = localStorage.getItem(TASKS_KEY);
+  const storedSessions = localStorage.getItem(SESSIONS_KEY);
+  if (!storedTasks && !storedSessions) return null;
+
+  let legacyTasks: Task[] = [];
+  let legacySessions: (Omit<Session, "id"> & { taskId: number | string | null })[] = [];
+  try {
+    const parsedTasks = storedTasks ? JSON.parse(storedTasks) : [];
+    legacyTasks = Array.isArray(parsedTasks) ? parsedTasks.map(migrateTask) : [];
+    const parsedSessions = storedSessions ? JSON.parse(storedSessions) : [];
+    legacySessions = Array.isArray(parsedSessions) ? parsedSessions : [];
+  } catch {
+    localStorage.setItem(MIGRATED_KEY, "true");
+    return null;
+  }
+
+  if (legacyTasks.length === 0 && legacySessions.length === 0) {
+    localStorage.setItem(MIGRATED_KEY, "true");
+    return null;
+  }
+
+  const idMap = new Map<string, string>(); // legacy task id (string) -> new server id
+  const createdTasks: Task[] = [];
+  for (const t of legacyTasks) {
+    try {
+      const res = await authFetch<{ task: RawTask }>("/tasks", token, {
+        method: "POST",
+        body: {
+          title: t.title,
+          description: t.description,
+          topic: t.topic,
+          priority: t.priority,
+          status: t.status,
+          deadlineDate: t.deadlineDate,
+          deadlineTime: t.deadlineTime,
+        },
+      });
+      const created = mapTask(res.task);
+      idMap.set(t.id, created.id);
+      createdTasks.push(created);
+    } catch (err) {
+      console.error("Migration: failed to move a task", err);
+    }
+  }
+
+  const createdSessions: Session[] = [];
+  for (const s of legacySessions) {
+    try {
+      const legacyTaskId = s.taskId != null ? String(s.taskId) : null;
+      const res = await authFetch<{ session: RawSession }>("/sessions", token, {
+        method: "POST",
+        body: {
+          taskId: legacyTaskId ? idMap.get(legacyTaskId) ?? null : null,
+          topic: s.topic,
+          duration: s.duration,
+        },
+      });
+      createdSessions.push(mapSession(res.session));
+    } catch (err) {
+      console.error("Migration: failed to move a session", err);
+    }
+  }
+
+  localStorage.setItem(MIGRATED_KEY, "true");
+  return { tasks: createdTasks, sessions: createdSessions };
+}
+
 type TaskContextType = {
   tasks: Task[];
   upcomingTasks: Task[];
   recentActivities: Activity[];
   sessions: Session[];
+  isLoading: boolean;
   addTask: (task: Omit<Task, "id" | "createdAt">) => void;
-  setTaskStatus: (id: number, status: TaskStatus) => void;
-  deleteTask: (id: number) => void;
+  setTaskStatus: (id: string, status: TaskStatus) => void;
+  deleteTask: (id: string) => void;
   getUpcomingTasks: () => Task[];
   logSession: (session: Omit<Session, "id" | "timestamp">) => void;
 };
@@ -447,6 +551,7 @@ const TaskContext = createContext<TaskContextType>({
   upcomingTasks: [],
   recentActivities: [],
   sessions: [],
+  isLoading: true,
   addTask: () => {},
   setTaskStatus: () => {},
   deleteTask: () => {},
@@ -455,56 +560,79 @@ const TaskContext = createContext<TaskContextType>({
 });
 
 export function TaskProvider({ children }: { children: React.ReactNode }) {
+  const { token, isLoading: authLoading } = useAuth();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [recentActivities, setRecentActivities] = useState<Activity[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Recent activity feed is still a local-only, per-device log (not requested
+  // to move to the database) — same load/persist pattern as before.
   useEffect(() => {
     if (typeof window === "undefined") return;
-
     try {
-      const storedTasks = localStorage.getItem(TASKS_KEY);
-      const parsedTasks = storedTasks ? JSON.parse(storedTasks) : null;
-      const initialTasks = Array.isArray(parsedTasks)
-        ? (parsedTasks as (Partial<Task> & { subject?: string })[]).map(migrateTask)
-        : DEFAULT_TASKS.map(migrateTask);
-
       const storedRecent = localStorage.getItem(RECENT_KEY);
       const parsedRecent = storedRecent ? JSON.parse(storedRecent) : null;
       const initialRecent = Array.isArray(parsedRecent)
         ? (parsedRecent as Activity[])
         : DEFAULT_ACTIVITIES.map((a) => ({ ...a }));
-
-      const storedSessions = localStorage.getItem(SESSIONS_KEY);
-      const parsedSessions = storedSessions ? JSON.parse(storedSessions) : null;
-      const initialSessions = Array.isArray(parsedSessions)
-        ? (parsedSessions as Session[])
-        : [];
-
-      // Avoid synchronous setState during the effect body (eslint rule).
-      setTimeout(() => {
-        setTasks(initialTasks);
-        setRecentActivities(initialRecent);
-        setSessions(initialSessions);
-        setIsLoading(false);
-      }, 0);
+      setTimeout(() => setRecentActivities(initialRecent), 0);
     } catch {
-      setTimeout(() => {
-        setTasks(DEFAULT_TASKS.map(migrateTask));
-        setRecentActivities([]);
-        setSessions([]);
-        setIsLoading(false);
-      }, 0);
+      setTimeout(() => setRecentActivities([]), 0);
     }
   }, []);
 
   useEffect(() => {
-    if (typeof window === "undefined" || isLoading) return;
-    localStorage.setItem(TASKS_KEY, JSON.stringify(tasks));
+    if (typeof window === "undefined") return;
     localStorage.setItem(RECENT_KEY, JSON.stringify(recentActivities));
-    localStorage.setItem(SESSIONS_KEY, JSON.stringify(sessions));
-  }, [tasks, recentActivities, sessions, isLoading]);
+  }, [recentActivities]);
+
+  // Tasks & sessions now live in MongoDB — fetched once auth resolves, with
+  // a one-time migration of any pre-existing localStorage data.
+  useEffect(() => {
+    if (authLoading) return;
+    if (!token) {
+      setTasks([]);
+      setSessions([]);
+      setIsLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      setIsLoading(true);
+      try {
+        const [taskRes, sessionRes] = await Promise.all([
+          authFetch<{ tasks: RawTask[] }>("/tasks", token),
+          authFetch<{ sessions: RawSession[] }>("/sessions", token),
+        ]);
+        if (cancelled) return;
+
+        let fetchedTasks = taskRes.tasks.map(mapTask);
+        let fetchedSessions = sessionRes.sessions.map(mapSession);
+
+        if (fetchedTasks.length === 0 && fetchedSessions.length === 0) {
+          const migrated = await migrateLegacyData(token);
+          if (migrated) {
+            fetchedTasks = migrated.tasks;
+            fetchedSessions = migrated.sessions;
+          }
+        }
+
+        if (cancelled) return;
+        setTasks(fetchedTasks);
+        setSessions(fetchedSessions);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [token, authLoading]);
 
   const logActivity = (entry: Omit<Activity, "id" | "at"> & { id?: number; at?: number }) => {
     setRecentActivities((prev) =>
@@ -515,47 +643,80 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
     );
   };
 
-  const addTask = (task: Omit<Task, "id" | "createdAt">) => {
-    setTasks((prev) => [{ ...task, id: Date.now(), createdAt: Date.now() }, ...prev]);
-    logActivity({ text: `Added "${task.title}" · ${task.topic || "General"}`, type: "created" });
+  const addTask = async (task: Omit<Task, "id" | "createdAt">) => {
+    if (!token) return;
+    try {
+      const res = await authFetch<{ task: RawTask }>("/tasks", token, {
+        method: "POST",
+        body: {
+          title: task.title,
+          description: task.description,
+          topic: task.topic,
+          priority: task.priority,
+          status: task.status,
+          deadlineDate: task.deadlineDate,
+          deadlineTime: task.deadlineTime,
+        },
+      });
+      const created = mapTask(res.task);
+      setTasks((prev) => [created, ...prev]);
+      logActivity({ text: `Added "${created.title}" · ${created.topic || "General"}`, type: "created" });
+    } catch (err) {
+      console.error(err);
+    }
   };
 
-  const setTaskStatus = (id: number, status: TaskStatus) => {
+  const setTaskStatus = async (id: string, status: TaskStatus) => {
     const target = tasks.find((t) => t.id === id);
-    if (!target || target.status === status) return;
+    if (!target || target.status === status || !token) return;
     const wasCompleted = target.status === "completed";
-    setTasks((prev) =>
-      prev.map((t) =>
-        t.id === id
-          ? { ...t, status, completedAt: status === "completed" ? Date.now() : undefined }
-          : t,
-      ),
-    );
-    // Log a completion event only when a task enters the "completed" column.
-    if (status === "completed" && !wasCompleted) {
-      logActivity({
-        text: `Completed "${target.title}" - ${target.topic || "General"}`,
-        type: "completed",
+    try {
+      const res = await authFetch<{ task: RawTask }>(`/tasks/${id}`, token, {
+        method: "PATCH",
+        body: { status },
       });
+      const updated = mapTask(res.task);
+      setTasks((prev) => prev.map((t) => (t.id === id ? updated : t)));
+      // Log a completion event only when a task enters the "completed" column.
+      if (status === "completed" && !wasCompleted) {
+        logActivity({
+          text: `Completed "${target.title}" - ${target.topic || "General"}`,
+          type: "completed",
+        });
+      }
+    } catch (err) {
+      console.error(err);
     }
   };
 
-  const deleteTask = (id: number) => {
+  const deleteTask = async (id: string) => {
+    if (!token) return;
     const target = tasks.find((t) => t.id === id);
-    setTasks((prev) => prev.filter((t) => t.id !== id));
-    if (target) {
-      logActivity({
-        text: `Removed "${target.title}" · ${target.topic || "General"}`,
-        type: "deleted",
-      });
+    try {
+      await authFetch(`/tasks/${id}`, token, { method: "DELETE" });
+      setTasks((prev) => prev.filter((t) => t.id !== id));
+      if (target) {
+        logActivity({
+          text: `Removed "${target.title}" · ${target.topic || "General"}`,
+          type: "deleted",
+        });
+      }
+    } catch (err) {
+      console.error(err);
     }
   };
 
-  const logSession = (session: Omit<Session, "id" | "timestamp">) => {
-    setSessions((prev) => [
-      { id: Date.now(), timestamp: Date.now(), ...session },
-      ...prev,
-    ]);
+  const logSession = async (session: Omit<Session, "id" | "timestamp">) => {
+    if (!token) return;
+    try {
+      const res = await authFetch<{ session: RawSession }>("/sessions", token, {
+        method: "POST",
+        body: { taskId: session.taskId, topic: session.topic, duration: session.duration },
+      });
+      setSessions((prev) => [mapSession(res.session), ...prev]);
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   const upcomingTasks = useMemo(() => filterUpcomingTasks(tasks), [tasks]);
@@ -567,13 +728,14 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
       upcomingTasks,
       recentActivities,
       sessions,
+      isLoading,
       addTask,
       setTaskStatus,
       deleteTask,
       getUpcomingTasks,
       logSession,
     }),
-    [tasks, upcomingTasks, recentActivities, sessions, getUpcomingTasks],
+    [tasks, upcomingTasks, recentActivities, sessions, isLoading, getUpcomingTasks],
   );
 
   return <TaskContext.Provider value={value}>{children}</TaskContext.Provider>;
