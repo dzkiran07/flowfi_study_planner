@@ -92,7 +92,7 @@ export default function NotesPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 p-6 dark:bg-slate-900">
+    <div className="min-h-screen bg-background p-6 dark:bg-slate-800">
       <div className="mx-auto max-w-6xl space-y-6">
         <DashboardHeader title="Notes" />
 
