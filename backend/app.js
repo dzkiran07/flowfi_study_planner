@@ -3,6 +3,8 @@ import cors from "cors";
 import dotenv from "dotenv";
 import connectDB from "./db/db.js";
 import userRouter from "./routes/userRoute.js";
+import taskRouter from "./routes/taskRoute.js";
+import sessionRouter from "./routes/sessionRoute.js";
 
 const app = express()
 
@@ -10,6 +12,8 @@ app.use(cors())
 app.use(express.json())
 dotenv.config()
 app.use("/auth", userRouter)
+app.use("/tasks", taskRouter)
+app.use("/sessions", sessionRouter)
 
 
 const startServer = async () => {
