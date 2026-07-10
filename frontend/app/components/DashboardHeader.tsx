@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Settings, LogOut, UserCircle2, Sun, Moon } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
+import { MODES, formatTimeLeft, useTimer } from "../context/TimerContext";
 
 
 type Props = {
@@ -14,6 +15,7 @@ type Props = {
 export default function DashboardHeader({ title = "Dashboard" }: Props) {
   const { user, logout } = useAuth();
   const { theme, setTheme } = useTheme();
+  const { mode, timeLeft, isRunning } = useTimer();
   const [open, setOpen] = useState(false);
 
 
@@ -44,9 +46,18 @@ export default function DashboardHeader({ title = "Dashboard" }: Props) {
     <header className="sticky top-0 z-20 flex w-full items-center justify-between gap-4 bg-white/95 dark:bg-slate-900/95 backdrop-blur px-6 py-4 rounded-2xl shadow-md border border-transparent dark:border-white/10">
       <h1 className="text-2xl font-bold text-black dark:text-white">{title}</h1>
 
+      <div className="flex items-center gap-3">
+        {isRunning && (
+          <Link
+            href="/dashboard/timer"
+            className="inline-flex items-center gap-1.5 rounded-full bg-orange-100 px-3 py-1.5 text-xs font-medium text-orange-700 transition-colors hover:bg-orange-200 dark:bg-orange-500/15 dark:text-orange-300 dark:hover:bg-orange-500/25"
+          >
+            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-orange-500" />
+            Active Session · {MODES[mode].label} · {formatTimeLeft(timeLeft)}
+          </Link>
+        )}
 
-
-      <div className="relative" ref={wrapperRef}>
+        <div className="relative" ref={wrapperRef}>
         <button
 
           type="button"
@@ -122,6 +133,7 @@ export default function DashboardHeader({ title = "Dashboard" }: Props) {
             </div>
           </div>
         )}
+        </div>
       </div>
     </header>
   );
