@@ -15,6 +15,7 @@ import {
   ACTIVITY_META,
   activityTypeOf,
 } from "../context/TaskContext";
+import { useTimer } from "../context/TimerContext";
 import {
   Flame,
   BookOpen,
@@ -33,8 +34,12 @@ import Inspiration from "../components/Inspiration";
 export default function DashboardPage() {
   const { user } = useAuth();
   const { tasks, upcomingTasks, recentActivities, sessions } = useTasks();
+  // `elapsedMinutes` is credited focus time for the in-progress Pomodoro; it
+  // is already 0 when there's nothing to credit, and — unlike `isRunning` —
+  // it deliberately stays put across a pause/reset so Study Hours never dips.
+  const { elapsedMinutes } = useTimer();
 
-  const stats = calculateStats(tasks, sessions);
+  const stats = calculateStats(tasks, sessions, elapsedMinutes);
   const weeklyProgress = aggregateSessionTopics(sessions);
 
   const currentDate = new Date().toLocaleDateString("en-US", {
