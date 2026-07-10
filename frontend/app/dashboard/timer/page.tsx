@@ -1,62 +1,63 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useEffect, useState } from "react";
 import { Play, Pause, RotateCcw, SkipForward, Music, Timer, CheckCircle2, ChevronDown } from "lucide-react";
 
 import DashboardHeader from "../../components/DashboardHeader";
+import MusicPlayer from "../../components/MusicPlayer";
 import { useTasks, topicColorClass } from "../../context/TaskContext";
+import { MODES, MODE_ORDER, formatTimeLeft, useTimer } from "../../context/TimerContext";
 
-type TimerMode = "pomodoro" | "shortBreak" | "longBreak";
+type Track = { id: string; label: string; src: string };
 
-const MODES: Record<
-  TimerMode,
-  { label: string; description: string; duration: number; activeBg: string; textColor: string; ringColor: string }
-> = {
-  pomodoro: {
-    label: "Pomodoro",
-    description: "Focus on deep work",
-    duration: 25 * 60,
-    activeBg: "bg-orange-500",
-    textColor: "text-orange-500",
-    ringColor: "stroke-orange-500",
-  },
-  shortBreak: {
-    label: "Short Break",
-    description: "Recharge briefly",
-    duration: 5 * 60,
-    activeBg: "bg-cyan-500",
-    textColor: "text-cyan-500",
-    ringColor: "stroke-cyan-500",
-  },
-  longBreak: {
-    label: "Long Break",
-    description: "Rest and recover",
-    duration: 15 * 60,
-    activeBg: "bg-pink-500",
-    textColor: "text-pink-500",
-    ringColor: "stroke-pink-500",
-  },
-};
+const TRACKS: Track[] = [
+  { id: "lofi", label: "Lo-fi Beats", src: "/audio/lofi-beats.mp3" },
+  { id: "piano", label: "Classical Piano", src: "/audio/classical-piano.mp3" },
+  { id: "rain", label: "Rain & Thunder", src: "/audio/rain-thunderstorm.mp3" },
+  { id: "binaural", label: "Binaural Beats", src: "/audio/binaural-beats.mp3" },
+];
 
-const MODE_ORDER: TimerMode[] = ["pomodoro", "shortBreak", "longBreak"];
+const MUSIC_TRACK_KEY = "flowfi_music_track";
 
 export default function TimerPage() {
-  const { tasks, logSession } = useTasks();
+  const { tasks } = useTasks();
+  const {
+    mode,
+    timeLeft,
+    isRunning,
+    completedSessions,
+    selectedTaskId,
+    setSelectedTaskId,
+    changeMode,
+    togglePlay,
+    reset,
+    skip,
+  } = useTimer();
 
-  const [mode, setMode] = useState<TimerMode>("pomodoro");
-  const [timeLeft, setTimeLeft] = useState(MODES.pomodoro.duration);
-  const [isRunning, setIsRunning] = useState(false);
-  const [completedSessions, setCompletedSessions] = useState(0);
-  const [musicSource, setMusicSource] = useState("");
+  // Background music: which preset track (if any) is selected, persisted
+  // per-browser so the choice survives a refresh/revisit. Actual playback
+  // (play/pause, seeking, volume) is owned entirely by <MusicPlayer>.
+  const [trackId, setTrackId] = useState<string | null>(null);
+  const [isMusicPlaying, setIsMusicPlaying] = useState(false);
+  const selectedTrack = TRACKS.find((t) => t.id === trackId) ?? null;
+
+  useEffect(() => {
+    const storedTrack = localStorage.getItem(MUSIC_TRACK_KEY);
+    if (storedTrack && TRACKS.some((t) => t.id === storedTrack)) setTrackId(storedTrack);
+  }, []);
+
+  useEffect(() => {
+    if (trackId) localStorage.setItem(MUSIC_TRACK_KEY, trackId);
+    else localStorage.removeItem(MUSIC_TRACK_KEY);
+  }, [trackId]);
+
+  const handleSelectTrack = (id: string) => {
+    setTrackId((prev) => (prev === id ? null : id));
+  };
 
   // Task linkage: only tasks currently "In Progress" can be tracked.
   const inProgressTasks = tasks.filter((t) => t.status === "in-progress");
-  const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
   const selectedTask = tasks.find((t) => t.id === selectedTaskId) ?? null;
-
-  // Ref mirror of the latest selection so the completion handler (which is
-  // intentionally NOT re-subscribed on every selection change) reads fresh data.
-  const selectedTaskRef = useRef(selectedTask);
 
   // Non-intrusive validation toast.
   const [toast, setToast] = useState<string | null>(null);
@@ -66,80 +67,16 @@ export default function TimerPage() {
     return () => clearTimeout(id);
   }, [toast]);
 
-  // Keep the ref mirror of the selected task in sync after every render.
-  useEffect(() => {
-    selectedTaskRef.current = selectedTask;
-  });
-
-  useEffect(() => {
-    // Reset timer whenever the mode changes.
-    const id = setTimeout(() => {
-      setTimeLeft(MODES[mode].duration);
-      setIsRunning(false);
-    }, 0);
-    return () => clearTimeout(id);
-  }, [mode]);
-
-  useEffect(() => {
-    if (!isRunning) return;
-
-    const interval = setInterval(() => {
-      setTimeLeft((prev) => (prev <= 1 ? 0 : prev - 1));
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [isRunning]);
-
-  // Handle completion: count pomodoros, log a session, auto-advance mode.
-  useEffect(() => {
-    if (timeLeft !== 0) return;
-    const id = setTimeout(() => {
-      setIsRunning(false);
-      if (mode === "pomodoro") {
-        setCompletedSessions((c) => c + 1);
-        const sel = selectedTaskRef.current;
-        if (sel) {
-          logSession({
-            taskId: sel.id,
-            topic: sel.topic || "General",
-            duration: MODES.pomodoro.duration / 60,
-          });
-        }
-        setMode("shortBreak");
-      } else {
-        setMode("pomodoro");
-      }
-    }, 0);
-    return () => clearTimeout(id);
-  }, [timeLeft, mode, logSession]);
-
   const handleTogglePlay = () => {
     const startingFresh = timeLeft === 0 || !isRunning;
     if (startingFresh && selectedTaskId === null) {
       setToast("Please select a task to track your focus session.");
       return;
     }
-    if (timeLeft === 0) {
-      setTimeLeft(MODES[mode].duration);
-      setIsRunning(true);
-    } else {
-      setIsRunning((r) => !r);
-    }
+    togglePlay();
   };
 
-  const handleReset = () => {
-    setTimeLeft(MODES[mode].duration);
-    setIsRunning(false);
-  };
-
-  const handleSkip = () => {
-    const next = MODE_ORDER[(MODE_ORDER.indexOf(mode) + 1) % MODE_ORDER.length];
-    setMode(next);
-  };
-
-  const minutes = Math.floor(timeLeft / 60);
-  const seconds = timeLeft % 60;
-  const displayTime = `${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
+  const displayTime = formatTimeLeft(timeLeft);
   const progress = timeLeft / MODES[mode].duration;
 
   const radius = 130;
@@ -165,7 +102,7 @@ export default function TimerPage() {
             return (
               <button
                 key={key}
-                onClick={() => setMode(key)}
+                onClick={() => changeMode(key)}
                 className={`rounded-xl px-2 py-2.5 text-center text-sm font-semibold transition-all ${
                   isActive
                     ? `${m.activeBg} text-white shadow`
@@ -191,7 +128,7 @@ export default function TimerPage() {
               <select
                 id="active-task"
                 value={selectedTaskId ?? ""}
-                onChange={(e) => setSelectedTaskId(e.target.value ? Number(e.target.value) : null)}
+                onChange={(e) => setSelectedTaskId(e.target.value || null)}
                 className="w-full appearance-none rounded-xl border border-slate-200 bg-white px-3 py-2.5 pr-9 text-sm font-medium text-slate-900 shadow-sm focus:border-indigo-600 focus:outline-none focus:ring-1 focus:ring-indigo-600 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
               >
                 <option value="">No task selected</option>
@@ -262,7 +199,7 @@ export default function TimerPage() {
           {/* Controls */}
           <div className="mt-8 flex items-center justify-center gap-4">
             <button
-              onClick={handleReset}
+              onClick={reset}
               aria-label="Reset timer"
               className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-sm transition-colors hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200 dark:hover:bg-slate-600"
             >
@@ -277,7 +214,7 @@ export default function TimerPage() {
             </button>
 
             <button
-              onClick={handleSkip}
+              onClick={skip}
               aria-label="Skip to next mode"
               className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-sm transition-colors hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200 dark:hover:bg-slate-600"
             >
@@ -310,27 +247,55 @@ export default function TimerPage() {
 
         {/* Background music */}
         <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-800">
-          <div className="flex items-center gap-4">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300">
-              <Music className="h-6 w-6" />
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300">
+              <Music className="h-5 w-5" />
             </div>
-            <div className="flex-1">
-              <label htmlFor="music" className="block text-sm font-medium text-slate-700 dark:text-slate-200">
-                Background Music
-              </label>
-              <input
-                id="music"
-                type="text"
-                value={musicSource}
-                onChange={(e) => setMusicSource(e.target.value)}
-                placeholder="Paste a music URL to play while you focus"
-                className="mt-1.5 w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm focus:border-indigo-600 focus:outline-none focus:ring-1 focus:ring-indigo-600 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
-              />
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-slate-700 dark:text-slate-200">Background Music</p>
+              <p className="truncate text-xs text-slate-400 dark:text-slate-500">
+                {selectedTrack
+                  ? isMusicPlaying
+                    ? `Now playing · ${selectedTrack.label}`
+                    : `${selectedTrack.label} · paused`
+                  : "Pick a track to play while you focus"}
+              </p>
             </div>
+            {selectedTrack && isMusicPlaying && (
+              <span className="ml-auto flex shrink-0 items-end gap-0.5" aria-hidden="true">
+                <span className="h-2 w-0.5 animate-pulse rounded-full bg-indigo-500 [animation-delay:0ms]" />
+                <span className="h-3.5 w-0.5 animate-pulse rounded-full bg-indigo-500 [animation-delay:150ms]" />
+                <span className="h-2.5 w-0.5 animate-pulse rounded-full bg-indigo-500 [animation-delay:300ms]" />
+              </span>
+            )}
           </div>
-          {musicSource.trim() !== "" && (
-            <audio className="mt-4 w-full" src={musicSource} controls autoPlay={isRunning} />
-          )}
+
+          <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {TRACKS.map((track) => {
+              const isActive = track.id === trackId;
+              return (
+                <button
+                  key={track.id}
+                  type="button"
+                  onClick={() => handleSelectTrack(track.id)}
+                  aria-pressed={isActive}
+                  className={`rounded-xl border px-3 py-2 text-xs font-medium transition-colors ${
+                    isActive
+                      ? "border-indigo-600 bg-indigo-600 text-white shadow-sm"
+                      : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-700"
+                  }`}
+                >
+                  {track.label}
+                </button>
+              );
+            })}
+          </div>
+
+          <MusicPlayer
+            className="mt-4"
+            src={selectedTrack?.src ?? null}
+            onPlayingChange={setIsMusicPlaying}
+          />
         </div>
       </div>
     </div>
