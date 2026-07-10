@@ -89,7 +89,7 @@ export default function StudyPlannerPage() {
     setShowForm(false);
   };
 
-  const handleToggle = (id: number, current: TaskStatus) => {
+  const handleToggle = (id: string, current: TaskStatus) => {
     setTaskStatus(id, current === "completed" ? "pending" : "completed");
   };
 
@@ -101,7 +101,7 @@ export default function StudyPlannerPage() {
     setTaskToDelete(null);
   };
 
-  const [draggingId, setDraggingId] = useState<number | null>(null);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragOverCol, setDragOverCol] = useState<TaskStatus | null>(null);
 
   const tasksByStatus = (status: TaskStatus) =>
@@ -618,6 +618,46 @@ export default function StudyPlannerPage() {
               >
                 <Trash2 className="h-4 w-4" />
                 Delete task
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete confirmation modal */}
+      {taskToDelete && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4"
+          onClick={() => setTaskToDelete(null)}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Confirm delete task"
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-6 shadow-xl dark:border-slate-700 dark:bg-slate-800"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex h-11 w-11 items-center justify-center rounded-full bg-red-50 text-red-600 dark:bg-red-500/15 dark:text-red-400">
+              <Trash2 className="h-5 w-5" />
+            </div>
+            <h3 className="mt-4 text-lg font-semibold text-slate-900 dark:text-slate-100">Delete task?</h3>
+            <p className="mt-1.5 text-sm text-slate-500 dark:text-slate-400">
+              This will permanently delete &ldquo;{taskToDelete.title}&rdquo;. This action cannot be undone.
+            </p>
+            <div className="mt-5 flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setTaskToDelete(null)}
+                className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200 dark:hover:bg-slate-600"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmDelete}
+                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700"
+              >
+                Delete
               </button>
             </div>
           </div>
