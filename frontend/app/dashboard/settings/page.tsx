@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { User, Sun, Bell, Trash2, Info } from "lucide-react";
+import { User, Sun, Trash2, Info } from "lucide-react";
 
 import DashboardHeader from "../../components/DashboardHeader";
 import { useTheme } from "../../context/ThemeContext";
@@ -13,14 +13,9 @@ export default function SettingsPage() {
   const [bio, setBio] = useState("");
 
   const { theme, setTheme } = useTheme();
-  const [emailNotifications, setEmailNotifications] = useState(true);
-  const [pushNotifications, setPushNotifications] = useState(true);
-  const [taskReminders, setTaskReminders] = useState(true);
-  const [examReminders, setExamReminders] = useState(true);
-  const [studySuggestions, setStudySuggestions] = useState(false);
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 dark:text-slate-100 py-8">
+    <div className="min-h-screen bg-background dark:bg-slate-800 dark:text-slate-100 py-8">
       <div className="max-w-2xl mx-auto space-y-6">
         <DashboardHeader title="Settings" />
 
@@ -126,109 +121,6 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        <div className="rounded-xl bg-white dark:bg-slate-800 p-6 shadow-sm">
-          <div className="flex items-center gap-3 mb-5">
-            <Bell className="h-5 w-5 text-slate-600 dark:text-slate-400" />
-            <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Notifications</h3>
-          </div>
-          <div className="space-y-4">
-            <div className="flex items-center justify-between py-2">
-              <div>
-                <p className="text-sm font-medium text-slate-900 dark:text-slate-100">Email Notifications</p>
-                <p className="text-xs text-slate-500 dark:text-slate-400">Receive updates via email</p>
-              </div>
-              <button
-                onClick={() => setEmailNotifications(!emailNotifications)}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                  emailNotifications ? "bg-purple-600" : "bg-slate-300 dark:bg-slate-600"
-                }`}
-              >
-                <span
-                  className={`inline-block h-5 w-5 rounded-full bg-white shadow transition-transform ${
-                    emailNotifications ? "translate-x-5" : "translate-x-1"
-                  }`}
-                />
-              </button>
-            </div>
-            <div className="border-t border-slate-100 dark:border-slate-700" />
-            <div className="flex items-center justify-between py-2">
-              <div>
-                <p className="text-sm font-medium text-slate-900 dark:text-slate-100">Push Notifications</p>
-                <p className="text-xs text-slate-500 dark:text-slate-400">Get notifications on your device</p>
-              </div>
-              <button
-                onClick={() => setPushNotifications(!pushNotifications)}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                  pushNotifications ? "bg-purple-600" : "bg-slate-300"
-                }`}
-              >
-                <span
-                  className={`inline-block h-5 w-5 rounded-full bg-white shadow transition-transform ${
-                    pushNotifications ? "translate-x-5" : "translate-x-1"
-                  }`}
-                />
-              </button>
-            </div>
-            <div className="border-t border-slate-100 dark:border-slate-700" />
-            <div className="flex items-center justify-between py-2">
-              <div>
-                <p className="text-sm font-medium text-slate-900 dark:text-slate-100">Task Reminders</p>
-                <p className="text-xs text-slate-500 dark:text-slate-400">Reminders for upcoming tasks</p>
-              </div>
-              <button
-                onClick={() => setTaskReminders(!taskReminders)}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                  taskReminders ? "bg-purple-600" : "bg-slate-300 dark:bg-slate-600"
-                }`}
-              >
-                <span
-                  className={`inline-block h-5 w-5 rounded-full bg-white shadow transition-transform ${
-                    taskReminders ? "translate-x-5" : "translate-x-1"
-                  }`}
-                />
-              </button>
-            </div>
-            <div className="border-t border-slate-100 dark:border-slate-700" />
-            <div className="flex items-center justify-between py-2">
-              <div>
-                <p className="text-sm font-medium text-slate-900 dark:text-slate-100">Exam Reminders</p>
-                <p className="text-xs text-slate-500 dark:text-slate-400">Reminders for upcoming exams</p>
-              </div>
-              <button
-                onClick={() => setExamReminders(!examReminders)}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                  examReminders ? "bg-purple-600" : "bg-slate-300 dark:bg-slate-600"
-                }`}
-              >
-                <span
-                  className={`inline-block h-5 w-5 rounded-full bg-white shadow transition-transform ${
-                    examReminders ? "translate-x-5" : "translate-x-1"
-                  }`}
-                />
-              </button>
-            </div>
-            <div className="border-t border-slate-100 dark:border-slate-700" />
-            <div className="flex items-center justify-between py-2">
-              <div>
-                <p className="text-sm font-medium text-slate-900 dark:text-slate-100">Study Suggestions</p>
-                <p className="text-xs text-slate-500 dark:text-slate-400">Personalized study recommendations</p>
-              </div>
-              <button
-                onClick={() => setStudySuggestions(!studySuggestions)}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                  studySuggestions ? "bg-purple-600" : "bg-slate-300 dark:bg-slate-600"
-                }`}
-              >
-                <span
-                  className={`inline-block h-5 w-5 rounded-full bg-white shadow transition-transform ${
-                    studySuggestions ? "translate-x-5" : "translate-x-1"
-                  }`}
-                />
-              </button>
-            </div>
-          </div>
-        </div>
-
         <div className="rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-6 shadow-sm">
           <div className="flex items-center gap-3 mb-5">
             <Trash2 className="h-5 w-5 text-red-600 dark:text-red-400" />
@@ -243,13 +135,6 @@ export default function SettingsPage() {
               Clear All Data
             </button>
           </div>
-        </div>
-
-        <div className="text-center pt-6">
-          <p className="text-lg font-semibold text-slate-900 dark:text-slate-100">StudySync</p>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            Version 1.0.0 • Built with ❤️ for students
-          </p>
         </div>
       </div>
     </div>
