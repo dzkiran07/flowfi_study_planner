@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { Plus, Trash2, Lock, X, ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, CheckCircle2 } from "lucide-react";
 import { useTasks } from "../../context/TaskContext";
+import { useToast } from "../../context/ToastContext";
 
 type Event = {
   id: string;
@@ -48,6 +49,7 @@ import DashboardHeader from "../../components/DashboardHeader";
 export default function CalendarPage() {
   const today = new Date();
   const { tasks } = useTasks();
+  const toast = useToast();
   const [currentMonthIndex, setCurrentMonthIndex] = useState(today.getMonth());
   const [currentYear, setCurrentYear] = useState(today.getFullYear());
   const [events, setEvents] = useState<Event[]>([]);
@@ -155,13 +157,18 @@ export default function CalendarPage() {
     setEventDate("");
     setEventDescription("");
     setShowModal(false);
+    toast.success("Event added", {
+      message: `"${newEvent.title}" scheduled for ${new Date(newEvent.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}.`,
+    });
   };
 
   const handleDeleteEvent = (id: string) => {
     // Locked (Study Planner) deadlines never live in `events` to begin with,
     // but guard anyway in case this is ever called with one.
     if (id.startsWith("deadline-")) return;
+    const target = events.find((e) => e.id === id);
     setEvents(events.filter((e) => e.id !== id));
+    if (target) toast.success("Event deleted", { message: `"${target.title}" was removed.` });
   };
 
   // Switches to the event's month (if needed) and briefly flickers its date
