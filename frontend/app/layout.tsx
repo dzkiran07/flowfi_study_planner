@@ -4,6 +4,7 @@ import { AuthProvider } from "./context/AuthContext";
 import { ThemeProvider } from "./context/ThemeContext";
 import { TaskProvider } from "./context/TaskContext";
 import { TimerProvider } from "./context/TimerContext";
+import { ToastProvider } from "./context/ToastContext";
 import "./globals.css";
 
 import "./dark-theme.css";
@@ -46,11 +47,13 @@ export default function RootLayout({
           }}
         />
         <ThemeProvider>
-          <AuthProvider>
-            <TaskProvider>
-            <TimerProvider>{children}</TimerProvider>
-          </TaskProvider>
-          </AuthProvider>
+          <ToastProvider>
+            <AuthProvider>
+              <TaskProvider>
+                <TimerProvider>{children}</TimerProvider>
+              </TaskProvider>
+            </AuthProvider>
+          </ToastProvider>
         </ThemeProvider>
       </body>
     </html>
