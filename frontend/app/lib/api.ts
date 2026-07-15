@@ -16,6 +16,9 @@ export async function authFetch<T>(
 ): Promise<T> {
   const res = await fetch(`${BASE_URL}${path}`, {
     method: options.method ?? "GET",
+    // Never let the browser serve a cached response for a per-user,
+    // authenticated request — every call must reflect the caller's token.
+    cache: "no-store",
     headers: {
       "Content-Type": "application/json",
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
