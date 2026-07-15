@@ -533,14 +533,14 @@ export default function StudyPlannerPage() {
       {/* Task detail modal */}
       {selectedTask && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4"
+          className="animate-overlay-in fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4"
           onClick={() => setSelectedTask(null)}
           role="dialog"
           aria-modal="true"
           aria-label="Task details"
         >
           <div
-            className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-xl dark:border-slate-700 dark:bg-slate-800"
+            className="animate-scale-in w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-xl dark:border-slate-700 dark:bg-slate-800"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start justify-between gap-3">
@@ -627,14 +627,14 @@ export default function StudyPlannerPage() {
       {/* Delete confirmation modal */}
       {taskToDelete && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4"
+          className="animate-overlay-in fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4"
           onClick={() => setTaskToDelete(null)}
           role="dialog"
           aria-modal="true"
           aria-label="Confirm delete task"
         >
           <div
-            className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-6 shadow-xl dark:border-slate-700 dark:bg-slate-800"
+            className="animate-scale-in w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-6 shadow-xl dark:border-slate-700 dark:bg-slate-800"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex h-11 w-11 items-center justify-center rounded-full bg-red-50 text-red-600 dark:bg-red-500/15 dark:text-red-400">
