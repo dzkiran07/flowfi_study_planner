@@ -1,9 +1,10 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, BookOpen, Calendar as CalendarIcon, CheckCircle2, Clock, Pencil, PlayCircle, PlusCircle, Trash2 } from "lucide-react";
 import { useAuth } from "./AuthContext";
 import { authFetch } from "../lib/api";
+import { useToast } from "./ToastContext";
 
 export type Priority = "HIGH" | "MEDIUM" | "LOW";
 
@@ -115,17 +116,15 @@ export function formatDuration(ms: number): string {
 
 // Legacy localStorage keys — read only for the one-time migration to the backend.
 const TASKS_KEY = "flowfi_study_tasks";
-const RECENT_KEY = "flowfi_recent_activities";
 const SESSIONS_KEY = "flowfi_study_sessions";
 const MIGRATED_KEY = "flowfi_migrated_v1";
 const MAX_ACTIVITIES = 8;
 
-const DEFAULT_ACTIVITIES: Activity[] = [
-  { id: 1, text: "Completed Read Physics Chapter 4 - Physics", at: Date.now() - 1000 * 60 * 42, type: "completed" },
-  { id: 2, text: 'Added "Submit History Essay" - History', at: Date.now() - 1000 * 60 * 60 * 3, type: "created" },
-  { id: 3, text: 'Started "Calculus" study session', at: Date.now() - 1000 * 60 * 60 * 5, type: "started" },
-  { id: 4, text: 'Added "Complete Calculus Assignment" - Mathematics', at: Date.now() - 1000 * 60 * 60 * 26, type: "created" },
-];
+// Recent activity is namespaced per-user so switching accounts on the same
+// browser never shows a previous user's feed.
+function recentActivitiesKey(userId: string): string {
+  return `flowfi_recent_activities_${userId}`;
+}
 
 // Shared priority-badge styling (colorful, solid badges used on both pages).
 export const PRIORITY_COLORS: Record<Priority, string> = {
@@ -560,32 +559,47 @@ const TaskContext = createContext<TaskContextType>({
 });
 
 export function TaskProvider({ children }: { children: React.ReactNode }) {
-  const { token, isLoading: authLoading } = useAuth();
+  const { user, token, isLoading: authLoading } = useAuth();
+  const toast = useToast();
+  const userId = user?.id ?? null;
   const [tasks, setTasks] = useState<Task[]>([]);
   const [recentActivities, setRecentActivities] = useState<Activity[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   // Recent activity feed is still a local-only, per-device log (not requested
-  // to move to the database) — same load/persist pattern as before.
+  // to move to the database), but namespaced per user so a sign-out/switch
+  // never leaks a previous account's feed into the next one.
+  const prevUserIdRef = useRef<string | null>(null);
   useEffect(() => {
     if (typeof window === "undefined") return;
+
+    const prevUserId = prevUserIdRef.current;
+    if (prevUserId && prevUserId !== userId) {
+      // Account switched or signed out — wipe the previous user's cached feed.
+      localStorage.removeItem(recentActivitiesKey(prevUserId));
+    }
+    prevUserIdRef.current = userId;
+
+    if (!userId) {
+      setRecentActivities([]);
+      return;
+    }
+
     try {
-      const storedRecent = localStorage.getItem(RECENT_KEY);
+      const storedRecent = localStorage.getItem(recentActivitiesKey(userId));
       const parsedRecent = storedRecent ? JSON.parse(storedRecent) : null;
-      const initialRecent = Array.isArray(parsedRecent)
-        ? (parsedRecent as Activity[])
-        : DEFAULT_ACTIVITIES.map((a) => ({ ...a }));
+      const initialRecent = Array.isArray(parsedRecent) ? (parsedRecent as Activity[]) : [];
       setTimeout(() => setRecentActivities(initialRecent), 0);
     } catch {
       setTimeout(() => setRecentActivities([]), 0);
     }
-  }, []);
+  }, [userId]);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    localStorage.setItem(RECENT_KEY, JSON.stringify(recentActivities));
-  }, [recentActivities]);
+    if (typeof window === "undefined" || !userId) return;
+    localStorage.setItem(recentActivitiesKey(userId), JSON.stringify(recentActivities));
+  }, [recentActivities, userId]);
 
   // Tasks & sessions now live in MongoDB — fetched once auth resolves, with
   // a one-time migration of any pre-existing localStorage data.
@@ -661,8 +675,9 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
       const created = mapTask(res.task);
       setTasks((prev) => [created, ...prev]);
       logActivity({ text: `Added "${created.title}" · ${created.topic || "General"}`, type: "created" });
+      toast.success("Task created", { message: `"${created.title}" added to ${created.topic || "General"}.` });
     } catch (err) {
-      console.error(err);
+      toast.error("Failed to add task", { message: err instanceof Error ? err.message : undefined });
     }
   };
 
@@ -677,15 +692,19 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
       });
       const updated = mapTask(res.task);
       setTasks((prev) => prev.map((t) => (t.id === id ? updated : t)));
+      const statusLabel = TASK_STATUSES.find((s) => s.key === status)?.label ?? status;
       // Log a completion event only when a task enters the "completed" column.
       if (status === "completed" && !wasCompleted) {
         logActivity({
           text: `Completed "${target.title}" - ${target.topic || "General"}`,
           type: "completed",
         });
+        toast.success("Task completed", { message: `"${target.title}" marked as done. Nice work!` });
+      } else {
+        toast.info("Task updated", { message: `"${target.title}" moved to ${statusLabel}.` });
       }
     } catch (err) {
-      console.error(err);
+      toast.error("Failed to update task", { message: err instanceof Error ? err.message : undefined });
     }
   };
 
@@ -700,9 +719,10 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
           text: `Removed "${target.title}" · ${target.topic || "General"}`,
           type: "deleted",
         });
+        toast.success("Task deleted", { message: `"${target.title}" was removed.` });
       }
     } catch (err) {
-      console.error(err);
+      toast.error("Failed to delete task", { message: err instanceof Error ? err.message : undefined });
     }
   };
 
@@ -715,7 +735,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
       });
       setSessions((prev) => [mapSession(res.session), ...prev]);
     } catch (err) {
-      console.error(err);
+      toast.error("Failed to log session", { message: err instanceof Error ? err.message : undefined });
     }
   };
 
