@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Settings, LogOut, UserCircle2, Sun, Moon } from "lucide-react";
+import { Settings, LogOut, UserCircle2, Sun, Moon, ShieldCheck } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 import { MODES, formatTimeLeft, useTimer } from "../context/TimerContext";
@@ -83,6 +83,17 @@ export default function DashboardHeader({ title = "Dashboard" }: Props) {
             </div>
 
             <div className="p-2">
+              {user?.role === "admin" && (
+                <Link
+                  href="/admin"
+                  onClick={() => setOpen(false)}
+                  className="flex items-center gap-3 w-full rounded-xl px-3 py-2 text-sm text-indigo-300 hover:bg-white/10 transition-colors"
+                >
+                  <ShieldCheck className="h-4 w-4" />
+                  Admin Panel
+                </Link>
+              )}
+
               <Link
                 href="/dashboard/settings"
                 onClick={() => setOpen(false)}
