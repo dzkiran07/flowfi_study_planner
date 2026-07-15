@@ -1,8 +1,8 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
+import { useAuthGuard } from "../lib/useAuthGuard";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -32,15 +32,10 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { user, isLoading, logout } = useAuth();
+  const { logout } = useAuth();
+  const { isAuthorized } = useAuthGuard();
   const router = useRouter();
   const pathname = usePathname();
-
-  useEffect(() => {
-    if (!isLoading && !user) {
-      router.push("/login");
-    }
-  }, [user, isLoading, router]);
 
   const handleLogout = async () => {
     await fetch("/api/logout", { method: "POST" });
@@ -48,16 +43,12 @@ export default function DashboardLayout({
     router.push("/login");
   };
 
-  if (isLoading) {
+  if (!isAuthorized) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background dark:bg-slate-800">
         <p className="text-slate-600">Loading...</p>
       </div>
     );
-  }
-
-  if (!user) {
-    return null;
   }
 
   return (
