@@ -2,6 +2,8 @@
 
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useTasks } from "./TaskContext";
+import { useAuth } from "./AuthContext";
+import { useToast } from "./ToastContext";
 
 export type TimerMode = "pomodoro" | "shortBreak" | "longBreak";
 
@@ -68,7 +70,11 @@ function playAlarm(ctx: AudioContext | null) {
   }
 }
 
-const STORAGE_KEY = "flowfi_timer_state";
+// Namespaced per user — a previous account's in-progress (not yet logged)
+// Pomodoro credit must never bleed into a different account's Study Hours.
+function timerStateKey(userId: string): string {
+  return `flowfi_timer_state_${userId}`;
+}
 
 type PersistedState = {
   mode: TimerMode;
@@ -114,6 +120,9 @@ const TimerContext = createContext<TimerContextType>({
 
 export function TimerProvider({ children }: { children: React.ReactNode }) {
   const { tasks, isLoading: tasksLoading, logSession } = useTasks();
+  const toast = useToast();
+  const { user } = useAuth();
+  const userId = user?.id ?? null;
 
   const [mode, setMode] = useState<TimerMode>("pomodoro");
   const [endAt, setEndAt] = useState<number | null>(null);
@@ -131,11 +140,40 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
   // (computed from wall-clock time below) stays visually live.
   const [, setTick] = useState(0);
 
-  // Hydrate from localStorage on mount.
+  function resetToDefaults() {
+    setMode("pomodoro");
+    setEndAt(null);
+    setPausedRemaining(MODES.pomodoro.duration);
+    setIsRunning(false);
+    setCompletedSessions(0);
+    setSelectedTaskId(null);
+    setAccumulatedMinutes(0);
+    setSegmentStartAt(null);
+  }
+
+  // Hydrate from this user's own namespaced key whenever the logged-in user
+  // changes (login, logout, or switching accounts on the same browser) — the
+  // previous user's key is wiped at the same moment, so a not-yet-logged
+  // Pomodoro's `accumulatedMinutes` can never bleed into the next account's
+  // Study Hours (calculateStats adds `elapsedMinutes` straight on top).
+  const prevUserIdRef = useRef<string | null>(null);
   useEffect(() => {
     if (typeof window === "undefined") return;
+
+    const prevUserId = prevUserIdRef.current;
+    if (prevUserId && prevUserId !== userId) {
+      localStorage.removeItem(timerStateKey(prevUserId));
+    }
+    prevUserIdRef.current = userId;
+
+    if (!userId) {
+      resetToDefaults();
+      setIsLoading(false);
+      return;
+    }
+
     try {
-      const stored = localStorage.getItem(STORAGE_KEY);
+      const stored = localStorage.getItem(timerStateKey(userId));
       const parsed = stored ? (JSON.parse(stored) as Partial<PersistedState>) : null;
       setTimeout(() => {
         if (parsed) {
@@ -147,17 +185,23 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
           setSelectedTaskId(parsed.selectedTaskId ?? null);
           setAccumulatedMinutes(parsed.accumulatedMinutes ?? 0);
           setSegmentStartAt(parsed.segmentStartAt ?? null);
+        } else {
+          resetToDefaults();
         }
         setIsLoading(false);
       }, 0);
     } catch {
-      setTimeout(() => setIsLoading(false), 0);
+      setTimeout(() => {
+        resetToDefaults();
+        setIsLoading(false);
+      }, 0);
     }
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId]);
 
   // Persist on every change.
   useEffect(() => {
-    if (typeof window === "undefined" || isLoading) return;
+    if (typeof window === "undefined" || isLoading || !userId) return;
     const toSave: PersistedState = {
       mode,
       endAt,
@@ -168,8 +212,9 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
       accumulatedMinutes,
       segmentStartAt,
     };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
+    localStorage.setItem(timerStateKey(userId), JSON.stringify(toSave));
   }, [
+    userId,
     mode,
     endAt,
     pausedRemaining,
@@ -234,9 +279,13 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
       setAccumulatedMinutes(0);
       setMode("shortBreak");
       setPausedRemaining(MODES.shortBreak.duration);
+      toast.success("Focus session complete", {
+        message: sel ? `Logged ${Math.round(finalMinutes) || 1} min on "${sel.title}".` : "Time for a short break.",
+      });
     } else {
       setMode("pomodoro");
       setPausedRemaining(MODES.pomodoro.duration);
+      toast.info("Break's over", { message: "Ready for another focus session?" });
     }
   }
 
