@@ -7,6 +7,7 @@ import DashboardHeader from "../../components/DashboardHeader";
 import MusicPlayer from "../../components/MusicPlayer";
 import { useTasks, topicColorClass } from "../../context/TaskContext";
 import { MODES, MODE_ORDER, formatTimeLeft, useTimer } from "../../context/TimerContext";
+import { useToast } from "../../context/ToastContext";
 
 type Track = { id: string; label: string; src: string };
 
@@ -59,18 +60,14 @@ export default function TimerPage() {
   const inProgressTasks = tasks.filter((t) => t.status === "in-progress");
   const selectedTask = tasks.find((t) => t.id === selectedTaskId) ?? null;
 
-  // Non-intrusive validation toast.
-  const [toast, setToast] = useState<string | null>(null);
-  useEffect(() => {
-    if (!toast) return;
-    const id = setTimeout(() => setToast(null), 3000);
-    return () => clearTimeout(id);
-  }, [toast]);
+  const toast = useToast();
 
   const handleTogglePlay = () => {
     const startingFresh = timeLeft === 0 || !isRunning;
     if (startingFresh && selectedTaskId === null) {
-      setToast("Please select a task to track your focus session.");
+      toast.warning("No task selected", {
+        message: "Select a task to track before starting your focus session.",
+      });
       return;
     }
     togglePlay();
@@ -86,12 +83,6 @@ export default function TimerPage() {
   return (
     <div className="flex flex-1 flex-col items-center">
       <DashboardHeader title="Timer" />
-
-      {toast && (
-        <div className="fixed left-1/2 top-24 z-50 -translate-x-1/2 rounded-xl border border-amber-200 bg-white px-4 py-2.5 text-sm font-medium text-amber-700 shadow-lg dark:border-amber-500/30 dark:bg-slate-800 dark:text-amber-300">
-          {toast}
-        </div>
-      )}
 
       <div className="mx-auto w-full max-w-xl px-4 py-8">
         {/* Mode switcher */}
