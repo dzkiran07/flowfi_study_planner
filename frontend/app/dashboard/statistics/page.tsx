@@ -45,6 +45,19 @@ function allTimeTopicBreakdown(sessions: Session[]): ProgressItem[] {
 
 type DayBucket = { key: string; label: string; minutes: number; isToday: boolean };
 
+// `toISOString()` converts to UTC, which silently shifts the calendar date
+// for any timezone ahead of UTC (e.g. a local midnight in IST is still the
+// previous day in UTC) — that mismatch was causing the last-7-days chart to
+// bucket sessions into the wrong day (or drop today's entirely). Building
+// the key from local date parts keeps both sides of the comparison in the
+// same timezone.
+function localDateKey(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 /** Study minutes for each of the last `days` calendar days (oldest first). */
 function lastNDaysStudyMinutes(sessions: Session[], days: number): DayBucket[] {
   const buckets: DayBucket[] = [];
@@ -55,7 +68,7 @@ function lastNDaysStudyMinutes(sessions: Session[], days: number): DayBucket[] {
     const d = new Date(today);
     d.setDate(d.getDate() - i);
     buckets.push({
-      key: d.toISOString().slice(0, 10),
+      key: localDateKey(d),
       label: d.toLocaleDateString("en-US", { weekday: "short" }),
       minutes: 0,
       isToday: i === 0,
@@ -64,7 +77,7 @@ function lastNDaysStudyMinutes(sessions: Session[], days: number): DayBucket[] {
 
   const byKey = new Map(buckets.map((b) => [b.key, b]));
   for (const s of sessions) {
-    const key = new Date(s.timestamp).toISOString().slice(0, 10);
+    const key = localDateKey(new Date(s.timestamp));
     const bucket = byKey.get(key);
     if (bucket) bucket.minutes += s.duration || 0;
   }
@@ -96,7 +109,7 @@ export default function StatisticsPage() {
     <div className="space-y-6">
       <DashboardHeader title="Statistics" />
 
-      <div>
+      <div className="animate-fade-in-up">
         <h2 className="text-3xl font-bold text-slate-900 dark:text-slate-50">Statistics</h2>
         <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
           Track your progress and performance over time.
@@ -105,42 +118,50 @@ export default function StatisticsPage() {
 
       {/* KPI row */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          label="Study Hours"
-          value={formatStudyHours(stats.studyHours)}
-          icon={Timer}
-          iconClass="bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-300"
-          hint={`${formatStudyHours(stats.studyHoursThisWeek)} this week`}
-        />
-        <StatCard
-          label="Focus Sessions"
-          value={sessions.length}
-          icon={CheckCircle2}
-          iconClass="bg-orange-50 text-orange-600 dark:bg-orange-500/10 dark:text-orange-300"
-          hint="Pomodoros logged"
-        />
-        <StatCard
-          label="Tasks Completed"
-          value={stats.completed}
-          icon={ListTodo}
-          iconClass="bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-300"
-          hint={`${stats.total} total tasks`}
-        />
-        <StatCard
-          label="Productivity"
-          value={stats.productivity}
-          suffix="%"
-          icon={TrendingUp}
-          iconClass="bg-purple-50 text-purple-600 dark:bg-purple-500/10 dark:text-purple-300"
-          hint={`${stats.completed}/${stats.total} done`}
-        />
+        <div className="animate-fade-in-up" style={{ animationDelay: "60ms" }}>
+          <StatCard
+            label="Study Hours"
+            value={formatStudyHours(stats.studyHours)}
+            icon={Timer}
+            iconClass="bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-300"
+            hint={`${formatStudyHours(stats.studyHoursThisWeek)} this week`}
+          />
+        </div>
+        <div className="animate-fade-in-up" style={{ animationDelay: "120ms" }}>
+          <StatCard
+            label="Focus Sessions"
+            value={sessions.length}
+            icon={CheckCircle2}
+            iconClass="bg-orange-50 text-orange-600 dark:bg-orange-500/10 dark:text-orange-300"
+            hint="Pomodoros logged"
+          />
+        </div>
+        <div className="animate-fade-in-up" style={{ animationDelay: "180ms" }}>
+          <StatCard
+            label="Tasks Completed"
+            value={stats.completed}
+            icon={ListTodo}
+            iconClass="bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-300"
+            hint={`${stats.total} total tasks`}
+          />
+        </div>
+        <div className="animate-fade-in-up" style={{ animationDelay: "240ms" }}>
+          <StatCard
+            label="Productivity"
+            value={stats.productivity}
+            suffix="%"
+            icon={TrendingUp}
+            iconClass="bg-purple-50 text-purple-600 dark:bg-purple-500/10 dark:text-purple-300"
+            hint={`${stats.completed}/${stats.total} done`}
+          />
+        </div>
       </div>
 
       {/* Weekly study time chart */}
-      <div className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-800">
+      <div className="animate-fade-in-up rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-800">
         <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-50">Study Time — Last 7 Days</h3>
         <div className="mt-6 flex h-40 items-end gap-3 sm:gap-4">
-          {weeklyBuckets.map((day) => {
+          {weeklyBuckets.map((day, i) => {
             const heightPct = day.minutes > 0 ? Math.max(6, Math.round((day.minutes / maxDayMinutes) * 100)) : 0;
             return (
               <div key={day.key} className="flex flex-1 flex-col items-center gap-2">
@@ -153,10 +174,10 @@ export default function StatisticsPage() {
                     {formatStudyHours(day.minutes / 60)}
                   </div>
                   <div
-                    className={`w-full max-w-[28px] rounded-t-md transition-all ${
+                    className={`w-full max-w-[28px] origin-bottom rounded-t-md transition-all duration-700 ease-out ${
                       day.isToday ? "bg-indigo-600 dark:bg-indigo-400" : "bg-indigo-300 dark:bg-indigo-500/50"
                     }`}
-                    style={{ height: `${heightPct}%` }}
+                    style={{ height: `${heightPct}%`, transitionDelay: `${i * 60}ms` }}
                   />
                 </div>
                 <span
@@ -176,7 +197,7 @@ export default function StatisticsPage() {
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Study time by topic (all-time) */}
-        <div className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-800">
+        <div className="animate-fade-in-up rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-800">
           <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-50">Study Time by Topic</h3>
           <div className="mt-4">
             <ProgressBar items={topicBreakdown} emptyHint="No study sessions yet. Finish a Pomodoro to see this breakdown." />
@@ -184,7 +205,7 @@ export default function StatisticsPage() {
         </div>
 
         {/* Task status breakdown */}
-        <div className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-800">
+        <div className="animate-fade-in-up rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-800" style={{ animationDelay: "100ms" }}>
           <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-50">Task Status</h3>
           {stats.total === 0 ? (
             <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">No tasks yet.</p>
@@ -220,7 +241,7 @@ export default function StatisticsPage() {
       </div>
 
       {/* Active task priority breakdown */}
-      <div className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-800">
+      <div className="animate-fade-in-up rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-800" style={{ animationDelay: "200ms" }}>
         <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-50">Active Tasks by Priority</h3>
         {activeTasks.length === 0 ? (
           <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">No active tasks — nice work!</p>
