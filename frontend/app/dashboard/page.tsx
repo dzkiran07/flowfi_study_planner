@@ -1,5 +1,8 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "../context/AuthContext";
 import {
   useTasks,
@@ -17,14 +20,31 @@ import {
 } from "../context/TaskContext";
 import { useTimer } from "../context/TimerContext";
 import {
-  Flame,
   BookOpen,
   Clock,
   ListTodo,
   CheckCircle2,
   Timer,
   TrendingUp,
+  Sunrise,
+  Sun,
+  Sunset,
+  Moon,
+  Play,
+  ShieldAlert,
 } from "lucide-react";
+
+/** Picks a time-of-day greeting + matching icon from an hour (0-23). */
+function getGreeting(hour: number) {
+  if (hour < 5) return { text: "Good Night", icon: Moon };
+  if (hour < 12) return { text: "Good Morning", icon: Sunrise };
+  if (hour < 17) return { text: "Good Afternoon", icon: Sun };
+  if (hour < 21) return { text: "Good Evening", icon: Sunset };
+  return { text: "Good Night", icon: Moon };
+}
+
+// A simple, fixed daily focus-time target used for the "Quick Stats" ring.
+const DAILY_GOAL_MINUTES = 120;
 
 import DashboardHeader from "../components/DashboardHeader";
 import StatCard from "../components/StatCard";
@@ -33,6 +53,8 @@ import Inspiration from "../components/Inspiration";
 
 export default function DashboardPage() {
   const { user } = useAuth();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const { tasks, upcomingTasks, recentActivities, sessions } = useTasks();
   // `elapsedMinutes` is credited focus time for the in-progress Pomodoro; it
   // is already 0 when there's nothing to credit, and — unlike `isRunning` —
@@ -42,73 +64,154 @@ export default function DashboardPage() {
   const stats = calculateStats(tasks, sessions, elapsedMinutes);
   const weeklyProgress = aggregateSessionTopics(sessions);
 
-  const currentDate = new Date().toLocaleDateString("en-US", {
+  // Ticks once a minute so the greeting/date roll over on their own —
+  // no refresh needed to go from "Good Morning" to "Good Afternoon".
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 60_000);
+    return () => clearInterval(id);
+  }, []);
+
+  // Surfaces *why* someone landed here after being bounced out of a
+  // restricted area (e.g. a non-admin hitting /admin), instead of a silent,
+  // unexplained redirect — then strips the param so it doesn't linger on
+  // refresh/share.
+  const denied = searchParams.get("denied");
+  useEffect(() => {
+    if (!denied) return;
+    const id = setTimeout(() => router.replace("/dashboard"), 4000);
+    return () => clearTimeout(id);
+  }, [denied, router]);
+
+  const { text: greeting, icon: GreetingIcon } = getGreeting(now.getHours());
+  const currentDate = now.toLocaleDateString("en-US", {
     weekday: "long",
     year: "numeric",
     month: "long",
     day: "numeric",
   });
 
+  // "Quick Stats" — focus minutes logged today (real sessions + any
+  // in-progress Pomodoro credit) against a fixed daily goal.
+  const startOfToday = new Date(now);
+  startOfToday.setHours(0, 0, 0, 0);
+  const todayMinutes =
+    sessions
+      .filter((s) => s.timestamp >= startOfToday.getTime())
+      .reduce((sum, s) => sum + (s.duration || 0), 0) + elapsedMinutes;
+  const goalPercent = Math.min(100, Math.round((todayMinutes / DAILY_GOAL_MINUTES) * 100));
+  const ringRadius = 18;
+  const ringCircumference = 2 * Math.PI * ringRadius;
+  const ringOffset = ringCircumference * (1 - goalPercent / 100);
+
   return (
     <div className="space-y-6">
       <DashboardHeader title="Dashboard" />
 
-      <div className="rounded-2xl bg-gradient-to-r from-indigo-600 to-pink-500 p-6 text-white">
-        <h2 className="text-2xl font-bold">Good Afternoon, {user?.fullName}!</h2>
-        <p className="mt-1 text-sm text-white/80">{currentDate}</p>
-        <div className="mt-4 inline-flex items-center gap-2 rounded-full bg-white/20 px-3 py-1 text-sm font-medium">
-          <Flame className="h-4 w-4" />
-          Your Streak: 12 Days
+      {denied && (
+        <div className="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
+          <ShieldAlert className="h-5 w-5 shrink-0" />
+          You don&apos;t have access to the {denied === "admin" ? "Admin Panel" : "requested page"}.
+        </div>
+      )}
+
+      <div className="animate-fade-in-up rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+        <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+          {/* Greeting */}
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-300">
+              <GreetingIcon className="h-5 w-5" />
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-50">
+                {greeting}, {user?.fullName}
+              </h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400">{currentDate}</p>
+            </div>
+          </div>
+
+          {/* Quick Stats: daily focus goal */}
+          <div className="flex items-center gap-3 rounded-xl bg-slate-50 px-4 py-2.5 dark:bg-slate-900/40">
+            <svg className="h-11 w-11 shrink-0 -rotate-90" viewBox="0 0 44 44">
+              <circle cx="22" cy="22" r={ringRadius} stroke="currentColor" strokeWidth="4" fill="none" className="text-slate-200 dark:text-slate-700" />
+              <circle
+                cx="22"
+                cy="22"
+                r={ringRadius}
+                stroke="currentColor"
+                strokeWidth="4"
+                fill="none"
+                strokeLinecap="round"
+                strokeDasharray={ringCircumference}
+                strokeDashoffset={ringOffset}
+                className="text-indigo-600 transition-all duration-500 dark:text-indigo-400"
+              />
+            </svg>
+            <div>
+              <p className="text-[11px] font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">Daily Goal</p>
+              <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                {formatStudyHours(todayMinutes / 60)} / {formatStudyHours(DAILY_GOAL_MINUTES / 60)}
+              </p>
+            </div>
+          </div>
+
+          {/* Primary CTA */}
+          <Link
+            href="/dashboard/timer"
+            className="press-feedback inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-700"
+          >
+            <Play className="h-4 w-4" />
+            Start Session
+          </Link>
         </div>
       </div>
 
-      <div className="rounded-xl bg-indigo-700 p-6 text-white">
-        <h3 className="text-lg font-semibold">Ready when you are</h3>
-        <p className="mt-1 text-sm text-white/80">Start a study session</p>
-        <p className="mt-1 text-sm text-white/70">Choose your subject and duration</p>
-        <button className="mt-4 rounded-lg bg-white px-4 py-2 text-sm font-medium text-indigo-700 hover:bg-white/90 transition-colors">
-          Start session
-        </button>
-      </div>
-
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          label="Active Tasks"
-          value={stats.active}
-          icon={ListTodo}
-          iconClass="bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-300"
-          hint={`${stats.total} total tasks`}
-        />
-        <StatCard
-          label="Completed"
-          value={stats.completed}
-          icon={CheckCircle2}
-          iconClass="bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-300"
-          hint={
-            stats.completedThisWeek > 0
-              ? `+${stats.completedThisWeek} this week`
-              : "No completions this week"
-          }
-        />
-        <StatCard
-          label="Study Hours"
-          value={formatStudyHours(stats.studyHours)}
-          icon={Timer}
-          iconClass="bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-300"
-          hint={`${formatStudyHours(stats.studyHoursThisWeek)} logged this week`}
-        />
-        <StatCard
-          label="Productivity"
-          value={stats.productivity}
-          suffix="%"
-          icon={TrendingUp}
-          iconClass="bg-purple-50 text-purple-600 dark:bg-purple-500/10 dark:text-purple-300"
-          hint={`${stats.completed}/${stats.total} done`}
-        />
+        <div className="animate-fade-in-up" style={{ animationDelay: "60ms" }}>
+          <StatCard
+            label="Active Tasks"
+            value={stats.active}
+            icon={ListTodo}
+            iconClass="bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-300"
+            hint={`${stats.total} total tasks`}
+          />
+        </div>
+        <div className="animate-fade-in-up" style={{ animationDelay: "120ms" }}>
+          <StatCard
+            label="Completed"
+            value={stats.completed}
+            icon={CheckCircle2}
+            iconClass="bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-300"
+            hint={
+              stats.completedThisWeek > 0
+                ? `+${stats.completedThisWeek} this week`
+                : "No completions this week"
+            }
+          />
+        </div>
+        <div className="animate-fade-in-up" style={{ animationDelay: "180ms" }}>
+          <StatCard
+            label="Study Hours"
+            value={formatStudyHours(stats.studyHours)}
+            icon={Timer}
+            iconClass="bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-300"
+            hint={`${formatStudyHours(stats.studyHoursThisWeek)} logged this week`}
+          />
+        </div>
+        <div className="animate-fade-in-up" style={{ animationDelay: "240ms" }}>
+          <StatCard
+            label="Productivity"
+            value={stats.productivity}
+            suffix="%"
+            icon={TrendingUp}
+            iconClass="bg-purple-50 text-purple-600 dark:bg-purple-500/10 dark:text-purple-300"
+            hint={`${stats.completed}/${stats.total} done`}
+          />
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <div className="rounded-xl border border-slate-200 bg-white p-5 lg:col-span-2 dark:border-slate-700 dark:bg-slate-800">
+        <div className="animate-fade-in-up rounded-xl border border-slate-200 bg-white p-5 lg:col-span-2 dark:border-slate-700 dark:bg-slate-800" style={{ animationDelay: "100ms" }}>
           <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-50">Upcoming Deadlines</h3>
           <div className="mt-4 space-y-3">
             {upcomingTasks.length === 0 ? (
@@ -148,8 +251,8 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <div className="space-y-6">
-          <Inspiration quote="Success is the sum of small efforts repeated day in and day out." author="Robert Collier" />
+        <div className="animate-fade-in-up space-y-6" style={{ animationDelay: "150ms" }}>
+          <Inspiration />
 
           <div className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-800">
             <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-50">Weekly Study Progress</h3>
@@ -163,7 +266,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <div className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-800">
+      <div className="animate-fade-in-up rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-800" style={{ animationDelay: "200ms" }}>
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-50">Recent Activity</h3>
           {recentActivities.length > 0 && (
@@ -188,7 +291,11 @@ export default function DashboardPage() {
                 const Icon = meta.icon;
                 const isLast = idx === recentActivities.length - 1;
                 return (
-                  <li key={activity.id} className="relative flex gap-4 pb-4">
+                  <li
+                    key={activity.id}
+                    className="animate-fade-in-up relative flex gap-4 rounded-lg pb-4 transition-colors hover:bg-slate-50 dark:hover:bg-slate-700/40"
+                    style={{ animationDelay: `${Math.min(idx, 6) * 50}ms` }}
+                  >
                     {!isLast && (
                       <span className="absolute left-[19px] top-10 h-[calc(100%-1.25rem)] w-px bg-slate-200 dark:bg-slate-700" aria-hidden />
                     )}
