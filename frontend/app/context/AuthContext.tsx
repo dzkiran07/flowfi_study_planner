@@ -2,15 +2,19 @@
 
 import { createContext, useContext, useEffect, useState } from "react";
 
+type AuthUser = { id: string; fullName: string; email: string; role?: "user" | "admin" };
+
 type AuthContextType = {
-  user: { id: string; fullName: string; email: string } | null;
+  user: AuthUser | null;
   token: string | null;
   isLoading: boolean;
   login: (data: {
-    user: { id: string; fullName: string; email: string };
+    user: AuthUser;
     token: string;
   }) => void;
   logout: () => void;
+  /** Patches the cached user in-place (state + localStorage) so the rest of the app reflects a profile edit immediately, without a re-login. */
+  updateUser: (patch: Partial<AuthUser>) => void;
 };
 
 const AuthContext = createContext<AuthContextType>({
@@ -19,28 +23,21 @@ const AuthContext = createContext<AuthContextType>({
   isLoading: true,
   login: () => {},
   logout: () => {},
+  updateUser: () => {},
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<{ id: string; fullName: string; email: string } | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const storedUser = localStorage.getItem("flowfi_user");
     const storedToken = localStorage.getItem("flowfi_token");
 
-    const parsedUser = storedUser ? JSON.parse(storedUser) : null;
-    const parsedToken = storedToken;
-    // Avoid synchronous setState during render/effect body (eslint rule)
-    setTimeout(() => {
-      if (parsedUser) setUser(parsedUser);
-      if (parsedToken) setToken(parsedToken);
-    }, 0);
-
-
-    // If we have a stored token, validate it by calling backend /auth/me.
-    // If validation fails, clear local auth.
+    // `user`/`token` only ever get set from a *validated* /auth/me response —
+    // never optimistically from cached localStorage — so there's no window
+    // where a stale or expired session looks authenticated to the rest of
+    // the app while `isLoading` is still true.
     const validate = async () => {
       if (!storedToken) {
         setIsLoading(false);
@@ -62,6 +59,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const meData = await meRes.json();
         if (meData?.success && meData?.user) {
           setUser(meData.user);
+          setToken(storedToken);
+          localStorage.setItem("flowfi_user", JSON.stringify(meData.user));
         } else {
           throw new Error("Unexpected /auth/me response");
         }
@@ -79,7 +78,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const login = (data: {
-    user: { id: string; fullName: string; email: string };
+    user: AuthUser;
     token: string;
   }) => {
     setUser(data.user);
@@ -95,8 +94,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem("flowfi_token");
   };
 
+  const updateUser = (patch: Partial<AuthUser>) => {
+    setUser((prev) => {
+      if (!prev) return prev;
+      const next = { ...prev, ...patch };
+      localStorage.setItem("flowfi_user", JSON.stringify(next));
+      return next;
+    });
+  };
+
   return (
-    <AuthContext.Provider value={{ user, token, isLoading, login, logout }}>
+    <AuthContext.Provider value={{ user, token, isLoading, login, logout, updateUser }}>
       {children}
     </AuthContext.Provider>
   );
