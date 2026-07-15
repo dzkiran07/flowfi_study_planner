@@ -5,6 +5,8 @@ import connectDB from "./db/db.js";
 import userRouter from "./routes/userRoute.js";
 import taskRouter from "./routes/taskRoute.js";
 import sessionRouter from "./routes/sessionRoute.js";
+import adminRouter from "./routes/adminRoute.js";
+import noteRouter from "./routes/noteRoute.js";
 
 const app = express()
 
@@ -14,6 +16,8 @@ dotenv.config()
 app.use("/auth", userRouter)
 app.use("/tasks", taskRouter)
 app.use("/sessions", sessionRouter)
+app.use("/admin", adminRouter)
+app.use("/notes", noteRouter)
 
 
 const startServer = async () => {
