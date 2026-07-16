@@ -7,6 +7,7 @@ import taskRouter from "./routes/taskRoute.js";
 import sessionRouter from "./routes/sessionRoute.js";
 import adminRouter from "./routes/adminRoute.js";
 import noteRouter from "./routes/noteRoute.js";
+import eventRouter from "./routes/eventRoute.js";
 
 const app = express()
 
@@ -18,6 +19,7 @@ app.use("/tasks", taskRouter)
 app.use("/sessions", sessionRouter)
 app.use("/admin", adminRouter)
 app.use("/notes", noteRouter)
+app.use("/events", eventRouter)
 
 
 const startServer = async () => {

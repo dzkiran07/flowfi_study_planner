@@ -1,9 +1,11 @@
 "use client";
 
 import { useState, useEffect, useMemo, useRef } from "react";
-import { Plus, Trash2, Lock, X, ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, CheckCircle2 } from "lucide-react";
+import { Plus, Trash2, Lock, X, ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, CheckCircle2, Loader2 } from "lucide-react";
 import { useTasks } from "../../context/TaskContext";
 import { useToast } from "../../context/ToastContext";
+import { useAuth } from "../../context/AuthContext";
+import { authFetch } from "../../lib/api";
 
 type Event = {
   id: string;
@@ -17,6 +19,19 @@ type Event = {
   /** True for events mirrored in from the Study Planner's task deadlines — view-only, can't be deleted here. */
   locked?: boolean;
 };
+
+type RawEvent = {
+  _id: string;
+  title: string;
+  type: string;
+  color: string | null;
+  date: string;
+  description: string;
+};
+
+function mapEvent(e: RawEvent): Event {
+  return { id: e._id, title: e.title, type: e.type, color: e.color ?? undefined, date: e.date, description: e.description };
+}
 
 const MONTHS = [
   "January", "February", "March", "April", "May", "June",
@@ -50,10 +65,38 @@ export default function CalendarPage() {
   const today = new Date();
   const { tasks } = useTasks();
   const toast = useToast();
+  const { token, isLoading: authLoading } = useAuth();
   const [currentMonthIndex, setCurrentMonthIndex] = useState(today.getMonth());
   const [currentYear, setCurrentYear] = useState(today.getFullYear());
   const [events, setEvents] = useState<Event[]>([]);
+  const [isLoadingEvents, setIsLoadingEvents] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [isSavingEvent, setIsSavingEvent] = useState(false);
+
+  useEffect(() => {
+    if (authLoading) return;
+    if (!token) {
+      setEvents([]);
+      setIsLoadingEvents(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      setIsLoadingEvents(true);
+      try {
+        const res = await authFetch<{ events: RawEvent[] }>("/events", token);
+        if (!cancelled) setEvents(res.events.map(mapEvent));
+      } catch (err) {
+        if (!cancelled) toast.error("Failed to load events", { message: err instanceof Error ? err.message : undefined });
+      } finally {
+        if (!cancelled) setIsLoadingEvents(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, authLoading]);
 
   // Study Planner tasks with a deadline are mirrored in as locked "Deadline"
   // events — derived every render (not stored), so they always stay in sync
@@ -133,42 +176,56 @@ export default function CalendarPage() {
     setShowModal(true);
   };
 
-  const handleAddEvent = (e: React.FormEvent) => {
+  const handleAddEvent = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!eventTitle.trim() || !eventDate) return;
+    if (!eventTitle.trim() || !eventDate || !token) return;
 
     const isCustom = eventType === "Other";
     const resolvedType = isCustom && customTypeName.trim() ? customTypeName.trim() : eventType;
 
-    const newEvent: Event = {
-      id: String(Date.now()),
-      title: eventTitle.trim(),
-      type: resolvedType,
-      color: isCustom ? customColor : undefined,
-      date: eventDate,
-      description: eventDescription.trim(),
-    };
-
-    setEvents([...events, newEvent]);
-    setEventTitle("");
-    setEventType("Exam");
-    setCustomTypeName("");
-    setCustomColor(DEFAULT_CUSTOM_COLOR);
-    setEventDate("");
-    setEventDescription("");
-    setShowModal(false);
-    toast.success("Event added", {
-      message: `"${newEvent.title}" scheduled for ${new Date(newEvent.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}.`,
-    });
+    setIsSavingEvent(true);
+    try {
+      const res = await authFetch<{ event: RawEvent }>("/events", token, {
+        method: "POST",
+        body: {
+          title: eventTitle.trim(),
+          type: resolvedType,
+          color: isCustom ? customColor : undefined,
+          date: eventDate,
+          description: eventDescription.trim(),
+        },
+      });
+      const created = mapEvent(res.event);
+      setEvents((prev) => [...prev, created]);
+      setEventTitle("");
+      setEventType("Exam");
+      setCustomTypeName("");
+      setCustomColor(DEFAULT_CUSTOM_COLOR);
+      setEventDate("");
+      setEventDescription("");
+      setShowModal(false);
+      toast.success("Event added", {
+        message: `"${created.title}" scheduled for ${new Date(created.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}.`,
+      });
+    } catch (err) {
+      toast.error("Failed to add event", { message: err instanceof Error ? err.message : undefined });
+    } finally {
+      setIsSavingEvent(false);
+    }
   };
 
-  const handleDeleteEvent = (id: string) => {
+  const handleDeleteEvent = async (id: string) => {
     // Locked (Study Planner) deadlines never live in `events` to begin with,
     // but guard anyway in case this is ever called with one.
-    if (id.startsWith("deadline-")) return;
+    if (id.startsWith("deadline-") || !token) return;
     const target = events.find((e) => e.id === id);
-    setEvents(events.filter((e) => e.id !== id));
-    if (target) toast.success("Event deleted", { message: `"${target.title}" was removed.` });
+    try {
+      await authFetch(`/events/${id}`, token, { method: "DELETE" });
+      setEvents((prev) => prev.filter((e) => e.id !== id));
+      if (target) toast.success("Event deleted", { message: `"${target.title}" was removed.` });
+    } catch (err) {
+      toast.error("Failed to delete event", { message: err instanceof Error ? err.message : undefined });
+    }
   };
 
   // Switches to the event's month (if needed) and briefly flickers its date
@@ -596,9 +653,11 @@ export default function CalendarPage() {
                 </button>
                 <button
                   type="submit"
-                  className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-indigo-700"
+                  disabled={isSavingEvent}
+                  className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  Add Event
+                  {isSavingEvent && <Loader2 className="h-4 w-4 animate-spin" />}
+                  {isSavingEvent ? "Saving..." : "Add Event"}
                 </button>
               </div>
             </form>
