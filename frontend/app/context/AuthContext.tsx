@@ -15,6 +15,8 @@ type AuthContextType = {
   logout: () => void;
   /** Patches the cached user in-place (state + localStorage) so the rest of the app reflects a profile edit immediately, without a re-login. */
   updateUser: (patch: Partial<AuthUser>) => void;
+  /** Swaps in a freshly-issued token (state + localStorage) without touching the cached user — used after a change-password call rotates the token. */
+  updateToken: (token: string) => void;
 };
 
 const AuthContext = createContext<AuthContextType>({
@@ -24,6 +26,7 @@ const AuthContext = createContext<AuthContextType>({
   login: () => {},
   logout: () => {},
   updateUser: () => {},
+  updateToken: () => {},
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -103,8 +106,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
   };
 
+  const updateToken = (newToken: string) => {
+    setToken(newToken);
+    localStorage.setItem("flowfi_token", newToken);
+  };
+
   return (
-    <AuthContext.Provider value={{ user, token, isLoading, login, logout, updateUser }}>
+    <AuthContext.Provider value={{ user, token, isLoading, login, logout, updateUser, updateToken }}>
       {children}
     </AuthContext.Provider>
   );

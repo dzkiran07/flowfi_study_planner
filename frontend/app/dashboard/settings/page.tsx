@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { User, Sun, Trash2, Info, Loader2, CheckCircle2, AlertTriangle, X } from "lucide-react";
+import { User, Sun, Trash2, Info, Loader2, CheckCircle2, AlertTriangle, X, ShieldCheck, LogOut } from "lucide-react";
 
 import DashboardHeader from "../../components/DashboardHeader";
 import { useTheme } from "../../context/ThemeContext";
@@ -12,7 +12,7 @@ import { authFetch } from "../../lib/api";
 type Profile = { fullName: string; email: string };
 
 export default function SettingsPage() {
-  const { token, user, isLoading: authLoading, updateUser } = useAuth();
+  const { token, user, isLoading: authLoading, updateUser, updateToken, logout } = useAuth();
   const toast = useToast();
 
   const [fullName, setFullName] = useState("");
@@ -73,6 +73,61 @@ export default function SettingsPage() {
   };
 
   const { theme, setTheme } = useTheme();
+
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmNewPassword, setConfirmNewPassword] = useState("");
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [isLoggingOutAll, setIsLoggingOutAll] = useState(false);
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!token) return;
+    setPasswordError(null);
+
+    if (newPassword !== confirmNewPassword) {
+      setPasswordError("New passwords don't match.");
+      return;
+    }
+
+    setIsChangingPassword(true);
+    try {
+      const res = await authFetch<{ token: string }>("/auth/change-password", token, {
+        method: "PATCH",
+        body: { currentPassword, newPassword },
+      });
+      updateToken(res.token);
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmNewPassword("");
+      toast.success("Password changed", { message: "Your password has been updated." });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to change password.";
+      setPasswordError(message);
+      toast.error("Failed to change password", { message });
+    } finally {
+      setIsChangingPassword(false);
+    }
+  };
+
+  const handleLogoutAll = async () => {
+    if (!token) return;
+    setIsLoggingOutAll(true);
+    try {
+      await authFetch("/auth/logout-all", token, { method: "POST" });
+      toast.success("Logged out everywhere", { message: "Please sign in again." });
+      logout();
+      setTimeout(() => {
+        window.location.href = "/login";
+      }, 500);
+      return;
+    } catch (err) {
+      toast.error("Failed to log out of all devices", { message: err instanceof Error ? err.message : undefined });
+    } finally {
+      setIsLoggingOutAll(false);
+    }
+  };
 
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [showClearPassword, setShowClearPassword] = useState(false);
@@ -145,7 +200,7 @@ export default function SettingsPage() {
               />
             </div>
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-slate-700 mb-1">
+              <label htmlFor="email" className="block text-sm font-medium text-slate-700 mb-1 dark:text-slate-300">
                 Email Address
               </label>
               <input
@@ -154,7 +209,7 @@ export default function SettingsPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 disabled={isLoadingProfile}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-1 focus:ring-indigo-600 disabled:opacity-60"
+                className="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 shadow-sm focus:outline-none focus:ring-1 focus:ring-indigo-600 disabled:opacity-60"
               />
             </div>
             <div className="flex items-center gap-3 pt-2">
@@ -210,6 +265,92 @@ export default function SettingsPage() {
                 Your theme preference is saved on this device and applied automatically on your next visit.
               </p>
             </div>
+          </div>
+        </div>
+
+        <div className="rounded-xl bg-white dark:bg-slate-800 p-6 shadow-sm">
+          <div className="flex items-center gap-3 mb-5">
+            <ShieldCheck className="h-5 w-5 text-slate-600 dark:text-slate-400" />
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Security</h3>
+          </div>
+          <form onSubmit={handleChangePassword} className="space-y-4">
+            {passwordError && (
+              <div className="rounded-lg bg-red-50 p-3 text-sm text-red-600 dark:bg-red-500/10 dark:text-red-400">
+                {passwordError}
+              </div>
+            )}
+            <div>
+              <label htmlFor="currentPassword" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                Current Password
+              </label>
+              <input
+                id="currentPassword"
+                type="password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                placeholder="••••••••"
+                required
+                className="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 shadow-sm focus:outline-none focus:ring-1 focus:ring-indigo-600"
+              />
+            </div>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <label htmlFor="newPassword" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                  New Password
+                </label>
+                <input
+                  id="newPassword"
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="At least 8 characters"
+                  required
+                  className="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 shadow-sm focus:outline-none focus:ring-1 focus:ring-indigo-600"
+                />
+              </div>
+              <div>
+                <label htmlFor="confirmNewPassword" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                  Confirm New Password
+                </label>
+                <input
+                  id="confirmNewPassword"
+                  type="password"
+                  value={confirmNewPassword}
+                  onChange={(e) => setConfirmNewPassword(e.target.value)}
+                  placeholder="Repeat new password"
+                  required
+                  className="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 shadow-sm focus:outline-none focus:ring-1 focus:ring-indigo-600"
+                />
+              </div>
+            </div>
+            <p className="text-xs text-slate-400 dark:text-slate-500">
+              Must be at least 8 characters and include a letter and a number.
+            </p>
+            <button
+              type="submit"
+              disabled={isChangingPassword}
+              className="press-feedback inline-flex items-center gap-2 rounded-lg bg-purple-600 px-5 py-2 text-sm font-medium text-white hover:bg-purple-700 transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {isChangingPassword && <Loader2 className="h-4 w-4 animate-spin" />}
+              {isChangingPassword ? "Updating..." : "Change Password"}
+            </button>
+          </form>
+
+          <div className="mt-6 flex items-center justify-between gap-4 rounded-lg bg-slate-50 p-4 dark:bg-slate-900/40">
+            <div>
+              <p className="text-sm font-medium text-slate-900 dark:text-slate-100">Log out of all devices</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Invalidates every active session, including this one. You&apos;ll need to sign in again.
+              </p>
+            </div>
+            <button
+              onClick={handleLogoutAll}
+              disabled={isLoggingOutAll}
+              className="press-feedback inline-flex shrink-0 items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200 dark:hover:bg-slate-600"
+            >
+              {isLoggingOutAll ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogOut className="h-4 w-4" />}
+              {isLoggingOutAll ? "Logging out..." : "Log Out Everywhere"}
+            </button>
           </div>
         </div>
 
