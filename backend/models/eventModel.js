@@ -21,7 +21,7 @@ const eventSchema = new mongoose.Schema({
         type: String,
         default: null
     },
-    // Stored as YYYY-MM-DD to match how the calendar UI keys days.
+    
     date: {
         type: String,
         required: true
