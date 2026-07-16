@@ -26,6 +26,13 @@ const userSchema = new mongoose.Schema({
         type: String,
         enum: ["user", "admin"],
         default: "user"
+    },
+    // Bumped whenever every outstanding token for this account should be
+    // invalidated (password change, "log out of all devices") — checked
+    // against the value baked into each JWT at issue time.
+    tokenVersion: {
+        type: Number,
+        default: 0
     }
 }, { timestamps: true });
 

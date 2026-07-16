@@ -4,6 +4,7 @@ import userModel from "../models/userModel.js";
 import taskModel from "../models/taskModel.js";
 import sessionModel from "../models/sessionModel.js";
 import noteModel from "../models/noteModel.js";
+import eventModel from "../models/eventModel.js";
 import { authMiddleware } from "../middleware/authMiddleware.js";
 import { adminMiddleware } from "../middleware/adminMiddleware.js";
 
@@ -13,8 +14,13 @@ function isValidEmail(email) {
     return typeof email === "string" && email.includes("@gmail.com");
 }
 
+// New accounts (including ones an admin creates by hand) go through the
+// same strength policy as self-service signup — 6-char passwords created
+// here would otherwise be a weaker back door than /auth/signup allows.
 function isValidPassword(password) {
-    return typeof password === "string" && password.trim().length >= 6;
+    if (typeof password !== "string") return false;
+    const trimmed = password.trim();
+    return trimmed.length >= 8 && /[a-zA-Z]/.test(trimmed) && /[0-9]/.test(trimmed);
 }
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
@@ -119,7 +125,7 @@ adminRouter.post("/users", authMiddleware, adminMiddleware, async (req, res) => 
 
         if (!isValidPassword(password)) {
             return res.status(400).send({
-                message: "Password must be at least 6 characters",
+                message: "Password must be at least 8 characters and include a letter and a number",
                 success: false,
             });
         }
@@ -273,6 +279,7 @@ adminRouter.delete("/users/:id", authMiddleware, adminMiddleware, async (req, re
             taskModel.deleteMany({ user: id }),
             sessionModel.deleteMany({ user: id }),
             noteModel.deleteMany({ user: id }),
+            eventModel.deleteMany({ user: id }),
         ]);
 
         res.status(200).send({
