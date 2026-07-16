@@ -98,6 +98,25 @@ body {
   animation: toast-in 0.25s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
+/* Slow, ambient drift for the landing-page hero's background blobs. */
+@keyframes blob-move-1 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(6%, -8%) scale(1.1); }
+  66% { transform: translate(-5%, 5%) scale(0.95); }
+}
+@keyframes blob-move-2 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(-7%, 6%) scale(1.05); }
+  66% { transform: translate(5%, -6%) scale(0.92); }
+}
+@keyframes blob-move-3 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(4%, 7%) scale(1.15); }
+}
+.animate-blob-1 { animation: blob-move-1 20s ease-in-out infinite; }
+.animate-blob-2 { animation: blob-move-2 24s ease-in-out infinite; }
+.animate-blob-3 { animation: blob-move-3 17s ease-in-out infinite; }
+
 .animate-fade-in-up {
   animation: fade-in-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
@@ -130,7 +149,10 @@ body {
   .animate-fade-in,
   .animate-scale-in,
   .animate-overlay-in,
-  .animate-toast-in {
+  .animate-toast-in,
+  .animate-blob-1,
+  .animate-blob-2,
+  .animate-blob-3 {
     animation: none !important;
   }
   .press-feedback:active {
