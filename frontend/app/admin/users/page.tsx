@@ -142,6 +142,22 @@ export default function AdminUsersPage() {
     }
   };
 
+  const [pageSize, setPageSize] = useState(10);
+  const [page, setPage] = useState(1);
+
+  // Any change to what's being shown resets to page 1 — otherwise a filter
+  // that shrinks the result set could leave the view stranded past the end.
+  useEffect(() => {
+    setPage(1);
+  }, [searchQuery, sortKey, sortDir, pageSize]);
+
+  const totalPages = Math.max(1, Math.ceil(sortedUsers.length / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const paginatedUsers = useMemo(
+    () => sortedUsers.slice((currentPage - 1) * pageSize, currentPage * pageSize),
+    [sortedUsers, currentPage, pageSize],
+  );
+
   const openEdit = (u: AdminUser) => {
     setEditingUser(u);
     setEditFullName(u.fullName);
@@ -299,7 +315,7 @@ export default function AdminUsersPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-                {sortedUsers.map((u) => (
+                {paginatedUsers.map((u) => (
                   <tr
                     key={u.id}
                     onClick={() => setViewingUser(u)}
@@ -364,6 +380,49 @@ export default function AdminUsersPage() {
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {!isLoading && sortedUsers.length > 0 && (
+          <div className="flex flex-col items-center justify-between gap-3 border-t border-slate-200 px-5 py-3 text-sm dark:border-slate-700 sm:flex-row">
+            <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400">
+              <span>
+                Showing {(currentPage - 1) * pageSize + 1}–{Math.min(currentPage * pageSize, sortedUsers.length)} of{" "}
+                {sortedUsers.length}
+              </span>
+              <select
+                value={pageSize}
+                onChange={(e) => setPageSize(Number(e.target.value))}
+                className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-600 focus:border-indigo-600 focus:outline-none focus:ring-1 focus:ring-indigo-600 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-300"
+              >
+                {[10, 25, 50].map((n) => (
+                  <option key={n} value={n}>
+                    {n} / page
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage <= 1}
+                className="press-feedback rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200 dark:hover:bg-slate-600"
+              >
+                Previous
+              </button>
+              <span className="px-1 text-xs font-medium text-slate-500 dark:text-slate-400">
+                Page {currentPage} of {totalPages}
+              </span>
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={currentPage >= totalPages}
+                className="press-feedback rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200 dark:hover:bg-slate-600"
+              >
+                Next
+              </button>
+            </div>
           </div>
         )}
       </div>
