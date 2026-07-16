@@ -183,7 +183,7 @@ export default function StudyPlannerPage() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search tasks..."
-              className="w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 py-2 text-sm text-slate-900 shadow-sm focus:border-indigo-600 focus:outline-none focus:ring-1 focus:ring-indigo-600"
+              className="w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 py-2 text-sm text-slate-900 shadow-sm focus:border-indigo-600 focus:outline-none focus:ring-1 focus:ring-indigo-600 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
             />
           </div>
           <div className="relative">
@@ -191,28 +191,28 @@ export default function StudyPlannerPage() {
               onClick={() => setShowFilters(!showFilters)}
               className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
                 showFilters || filterTopic !== "All" || filterPriority !== "All"
-                  ? "border-indigo-200 bg-indigo-50 text-indigo-700"
-                  : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                  ? "border-indigo-200 bg-indigo-50 text-indigo-700 dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-300"
+                  : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
               }`}
             >
               <Filter className="h-4 w-4" />
               Filter
               {(filterTopic !== "All" || filterPriority !== "All") && (
-                <span className="ml-1 rounded-full bg-indigo-100 px-1.5 py-0.5 text-xs font-semibold text-indigo-700">
+                <span className="ml-1 rounded-full bg-indigo-100 px-1.5 py-0.5 text-xs font-semibold text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300">
                   {[filterTopic, filterPriority].filter((v) => v !== "All").length}
                 </span>
               )}
             </button>
 
             {showFilters && (
-              <div className="absolute left-0 top-full z-20 mt-2 w-72 rounded-xl border border-slate-200 bg-white p-4 shadow-lg">
+              <div className="absolute left-0 top-full z-20 mt-2 w-72 rounded-xl border border-slate-200 bg-white p-4 shadow-lg dark:border-slate-700 dark:bg-slate-800">
                 <div className="space-y-3">
                   <div>
-                    <label className="block text-xs font-medium text-slate-500 mb-1">Topic</label>
+                    <label className="block text-xs font-medium text-slate-500 mb-1 dark:text-slate-400">Topic</label>
                     <select
                       value={filterTopic}
                       onChange={(e) => setFilterTopic(e.target.value)}
-                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:border-indigo-600 focus:outline-none focus:ring-1 focus:ring-indigo-600"
+                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:border-indigo-600 focus:outline-none focus:ring-1 focus:ring-indigo-600 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
                     >
                       <option value="All">All Topics</option>
                       {uniqueTopics.map((s) => (
@@ -223,11 +223,11 @@ export default function StudyPlannerPage() {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-slate-500 mb-1">Priority</label>
+                    <label className="block text-xs font-medium text-slate-500 mb-1 dark:text-slate-400">Priority</label>
                     <select
                       value={filterPriority}
                       onChange={(e) => setFilterPriority(e.target.value)}
-                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:border-indigo-600 focus:outline-none focus:ring-1 focus:ring-indigo-600"
+                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:border-indigo-600 focus:outline-none focus:ring-1 focus:ring-indigo-600 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
                     >
                       <option value="All">All Priorities</option>
                       <option value="HIGH">High</option>
@@ -243,7 +243,7 @@ export default function StudyPlannerPage() {
                         setFilterPriority("All");
                         setShowFilters(false);
                       }}
-                      className="text-xs font-medium text-slate-500 hover:text-slate-700"
+                      className="text-xs font-medium text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
                     >
                       Reset filters
                     </button>
@@ -271,12 +271,12 @@ export default function StudyPlannerPage() {
 
       {/* Add Task Form */}
       {showForm && (
-        <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
+        <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 dark:border-slate-700 dark:bg-slate-800">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-slate-900">Create New Study Task</h3>
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-50">Create New Study Task</h3>
             <button
               onClick={() => setShowForm(false)}
-              className="rounded-lg p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+              className="rounded-lg p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors dark:hover:bg-slate-700 dark:hover:text-slate-200"
             >
               <X className="h-5 w-5" />
             </button>
@@ -284,7 +284,7 @@ export default function StudyPlannerPage() {
           <form onSubmit={handleAddTask} className="space-y-4">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="sm:col-span-2">
-                <label htmlFor="title" className="block text-sm font-medium text-slate-700 mb-1">
+                <label htmlFor="title" className="block text-sm font-medium text-slate-700 mb-1 dark:text-slate-300">
                   Task Title
                 </label>
                 <input
@@ -292,13 +292,13 @@ export default function StudyPlannerPage() {
                   type="text"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-indigo-600 focus:outline-none focus:ring-1 focus:ring-indigo-600"
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-indigo-600 focus:outline-none focus:ring-1 focus:ring-indigo-600 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
                   placeholder="Enter task title"
                   required
                 />
               </div>
               <div className="sm:col-span-2">
-                <label htmlFor="description" className="block text-sm font-medium text-slate-700 mb-1">
+                <label htmlFor="description" className="block text-sm font-medium text-slate-700 mb-1 dark:text-slate-300">
                   Description
                 </label>
                 <textarea
@@ -306,12 +306,12 @@ export default function StudyPlannerPage() {
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   rows={2}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-indigo-600 focus:outline-none focus:ring-1 focus:ring-indigo-600"
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-indigo-600 focus:outline-none focus:ring-1 focus:ring-indigo-600 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
                   placeholder="Enter task description"
                 />
               </div>
               <div className="sm:col-span-2">
-                <label htmlFor="topic" className="block text-sm font-medium text-slate-700 mb-1">
+                <label htmlFor="topic" className="block text-sm font-medium text-slate-700 mb-1 dark:text-slate-300">
                   Topic
                 </label>
                 <input
@@ -319,12 +319,12 @@ export default function StudyPlannerPage() {
                   type="text"
                   value={topic}
                   onChange={(e) => setTopic(e.target.value)}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-indigo-600 focus:outline-none focus:ring-1 focus:ring-indigo-600"
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-indigo-600 focus:outline-none focus:ring-1 focus:ring-indigo-600 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
                   placeholder="e.g. Mathematics, Coding, History"
                 />
               </div>
               <div>
-                <label htmlFor="priority" className="block text-sm font-medium text-slate-700 mb-1">
+                <label htmlFor="priority" className="block text-sm font-medium text-slate-700 mb-1 dark:text-slate-300">
                   Priority
                 </label>
                 <div className="relative">
@@ -332,7 +332,7 @@ export default function StudyPlannerPage() {
                     id="priority"
                     value={priority}
                     onChange={(e) => setPriority(e.target.value as Priority)}
-                    className="w-full appearance-none rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-indigo-600 focus:outline-none focus:ring-1 focus:ring-indigo-600"
+                    className="w-full appearance-none rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-indigo-600 focus:outline-none focus:ring-1 focus:ring-indigo-600 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
                   >
                     <option value="HIGH">High</option>
                     <option value="MEDIUM">Medium</option>
@@ -342,13 +342,13 @@ export default function StudyPlannerPage() {
                 </div>
               </div>
               <div>
-                <label htmlFor="deadlineDate" className="block text-sm font-medium text-slate-700 mb-1">
+                <label htmlFor="deadlineDate" className="block text-sm font-medium text-slate-700 mb-1 dark:text-slate-300">
                   Due Date
                 </label>
                 <DatePicker value={deadlineDate} onChange={setDeadlineDate} />
               </div>
               <div>
-                <label htmlFor="deadlineTime" className="block text-sm font-medium text-slate-700 mb-1">
+                <label htmlFor="deadlineTime" className="block text-sm font-medium text-slate-700 mb-1 dark:text-slate-300">
                   Due Time
                 </label>
                 <TimePicker value={deadlineTime} onChange={setDeadlineTime} />
@@ -358,7 +358,7 @@ export default function StudyPlannerPage() {
               <button
                 type="button"
                 onClick={() => setShowForm(false)}
-                className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors"
+                className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200 dark:hover:bg-slate-600"
               >
                 Cancel
               </button>
