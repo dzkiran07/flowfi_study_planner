@@ -174,10 +174,7 @@ export default function LandingPage() {
           className="relative mx-auto flex max-w-5xl flex-col items-center px-6 py-24 text-center sm:py-32"
           style={{ opacity: heroOpacity, transform: `translateY(${heroShift}px)` }}
         >
-          <div className="animate-fade-in-up inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-xs font-medium text-indigo-300">
-            <ShieldCheck className="h-3.5 w-3.5" />
-            Built for focused, distraction-free studying
-          </div>
+          
 
           <h1 className="animate-fade-in-up mt-6 text-4xl font-bold tracking-tight text-white sm:text-6xl" style={{ animationDelay: "60ms" }}>
             Your Complete Student
@@ -189,7 +186,7 @@ export default function LandingPage() {
 
           <p className="animate-fade-in-up mt-6 max-w-2xl text-lg leading-8 text-slate-400" style={{ animationDelay: "120ms" }}>
             Flow-Fi brings your tasks, Pomodoro timer, calendar, and progress tracking into one
-            focused workspace — so you always know what to study next.
+            focused workspace so you always know what to study next.
           </p>
 
           <div className="animate-fade-in-up mt-10 flex flex-col items-center gap-4 sm:flex-row" style={{ animationDelay: "180ms" }}>
