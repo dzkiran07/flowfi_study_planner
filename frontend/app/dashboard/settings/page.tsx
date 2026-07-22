@@ -8,6 +8,7 @@ import { useTheme } from "../../context/ThemeContext";
 import { useAuth } from "../../context/AuthContext";
 import { useToast } from "../../context/ToastContext";
 import { authFetch } from "../../lib/api";
+import PasswordInput from "../../components/PasswordInput";
 
 type Profile = { fullName: string; email: string };
 
@@ -283,9 +284,8 @@ export default function SettingsPage() {
               <label htmlFor="currentPassword" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                 Current Password
               </label>
-              <input
+              <PasswordInput
                 id="currentPassword"
-                type="password"
                 value={currentPassword}
                 onChange={(e) => setCurrentPassword(e.target.value)}
                 placeholder="••••••••"
@@ -298,9 +298,8 @@ export default function SettingsPage() {
                 <label htmlFor="newPassword" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                   New Password
                 </label>
-                <input
+                <PasswordInput
                   id="newPassword"
-                  type="password"
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   placeholder="At least 8 characters"
@@ -312,9 +311,8 @@ export default function SettingsPage() {
                 <label htmlFor="confirmNewPassword" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                   Confirm New Password
                 </label>
-                <input
+                <PasswordInput
                   id="confirmNewPassword"
-                  type="password"
                   value={confirmNewPassword}
                   onChange={(e) => setConfirmNewPassword(e.target.value)}
                   placeholder="Repeat new password"
@@ -457,9 +455,8 @@ export default function SettingsPage() {
                 <label htmlFor="clearPassword" className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
                   Password
                 </label>
-                <input
+                <PasswordInput
                   id="clearPassword"
-                  type="password"
                   autoFocus
                   required
                   value={clearPassword}
