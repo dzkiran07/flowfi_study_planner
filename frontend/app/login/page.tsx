@@ -5,6 +5,7 @@ import { useState } from "react";
 import Image from "next/image";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
+import PasswordInput from "../components/PasswordInput";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -103,9 +104,8 @@ export default function LoginPage() {
               <label htmlFor="password" className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
                 Password
               </label>
-              <input
+              <PasswordInput
                 id="password"
-                type="password"
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
